@@ -19,6 +19,12 @@ Given a list of cities and the distances between each pair of cities, what is th
     We have converted the data from TSPLIB format to adjacent matrix format.  
     It contains China - 71,009 Cities.  
 
+#### Folders
+1. dataset/: ALL of the datasets
+2. baseline/: our baseline codes
+3. distributed/: our MPI distributed version of codes
+4. parallel/: our parallel version of codes
+
 #### TODO list:
 - [x] Find dataset for TSP
 - [ ] Write baseline (single thread version) for Genetic algorithm (GA)
