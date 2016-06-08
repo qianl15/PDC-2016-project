@@ -13,12 +13,14 @@ Given a list of cities and the distances between each pair of cities, what is th
     DANTZIG42 is a set of 42 cities, from TSPLIB. The minimal tour has length 699.  
     FRI26 is a set of 26 cities, from TSPLIB. The minimal tour has length 937.  
     GR17 is a set of 17 cities, from TSPLIB. The minimal tour has length 2085.  
-2. [China - 71,009 Cities](http://www.math.uwaterloo.ca/tsp/world/chlog.html)  
+2. [TSPLIB library](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/)
+    ch150 is a set of 150 cities, from TSPLIB. The minimal tour has length 6528.
+3. [China - 71,009 Cities](http://www.math.uwaterloo.ca/tsp/world/chlog.html)  
     We have converted the data from TSPLIB format to adjacent matrix format.  
     It contains China - 71,009 Cities.  
 
 #### TODO list:
-- [ ] Find dataset for TSP
+- [x] Find dataset for TSP
 - [ ] Write baseline (single thread version) for Genetic algorithm (GA)
 - [ ] Write baseline (single thread versiion) for Simulated Annealing algorithm (SA)
 - [ ] Build MPI environment on the server
