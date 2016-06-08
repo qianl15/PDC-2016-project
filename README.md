@@ -9,14 +9,12 @@ Given a list of cities and the distances between each pair of cities, what is th
 #### Datasets (you can find the data in "dataset" folder):  
 1. [TSP Data for the Traveling Salesperson Problem](https://people.sc.fsu.edu/~jburkardt/datasets/tsp/tsp.html)  
     All of the data are saved in adjacent matrix format.  
-    ATT48 is a set of 48 cities (US state capitals) from TSPLIB. The minimal tour has length 10628.  
     DANTZIG42 is a set of 42 cities, from TSPLIB. The minimal tour has length 699.  
     FRI26 is a set of 26 cities, from TSPLIB. The minimal tour has length 937.  
     GR17 is a set of 17 cities, from TSPLIB. The minimal tour has length 2085.  
 2. [TSPLIB library](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/)  
     ch150 is a set of 150 cities, from TSPLIB. The minimal tour has length 6528.
 3. [China - 71,009 Cities](http://www.math.uwaterloo.ca/tsp/world/chlog.html)  
-    We have converted the data from TSPLIB format to adjacent matrix format.  
     It contains China - 71,009 Cities.  
 
 #### Folders
