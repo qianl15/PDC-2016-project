@@ -19,15 +19,23 @@ Given a list of cities and the distances between each pair of cities, what is th
 
 #### Folders
 1. dataset/: ALL of the datasets
-2. baseline/: our baseline codes
+2. baseline/: our baseline codes  
 3. distributed/: our MPI distributed version of codes
 4. parallel/: our parallel version of codes
+
+#### User Guide:
+How to run the baseline demo:  
+```
+cd ./baseline  
+make  
+./run.sh  
+```
 
 #### TODO list:
 - [x] Find dataset for TSP
 - [ ] Write baseline (single thread version) for Genetic algorithm (GA)
-- [ ] Write baseline (single thread versiion) for Simulated Annealing algorithm (SA)
-- [ ] Build MPI environment on the server
+- [x] Write baseline (single thread versiion) for Simulated Annealing algorithm (SA)
+- [x] Build MPI environment on the server
 - [ ] Write MPI version of two algorithms
 - [ ] Write CUDA / OpenCL version of two algorithms
 - [ ] **Optimization for MPI and GPU = =
