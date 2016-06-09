@@ -112,8 +112,8 @@ void saTSP(int* tour) {
 
 			/* Proposal 1: Block Reverse between p and q */
 			int p = rand()%N, q = rand()%N;
-			// If will occur error if p=0 q=16...
-			if (abs(p - q) == 16) {
+			// If will occur error if p=0 q=N-1...
+			if (abs(p - q) == N-1) {
 				q = rand()%(N-1);
 				p = rand()%(N-2);
 			}
