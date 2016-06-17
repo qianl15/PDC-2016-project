@@ -14,7 +14,9 @@
 #include <math.h>
 #include <algorithm>
 #include <sys/time.h>
-#define MAXITER 20		// Proposal 20 routes and then select the best one
+#include <pthread.h>
+#include <omp.h>
+#define MAXITER 5		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
 #define RELAX 4000		// The times of relaxation of the same temperature
@@ -29,6 +31,7 @@ float minTourDist = -1;		// The distance of shortest path
 int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
+float currLen[MAXITER]={};
 
 /* load the data */
 void loadFile(char* filename) {
@@ -178,7 +181,13 @@ void saTSP(int* tour) {
 	return;
 }
 
+void *routine(void *tour) {
+	random_shuffle((int *)tour, (int *)tour + N);
+	saTSP((int *)tour);
+}
+
 int main(int argc, char **argv) {
+	int nprocess = 1;
 	if (argc < 2) {
 		printf("Please enter the filename!\n");
 		return 0;
@@ -186,26 +195,45 @@ int main(int argc, char **argv) {
 	else {
 		loadFile(argv[1]);
 	}
+	if (argc > 2) {
+		nprocess = atoi(argv[2]);
+	}
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
 	minTour = (int *)malloc(sizeof(int) * N);
-	int *currTour = (int *)malloc(sizeof(int) * N);
 	srand(time(0));
-	for (int i = 0; i < MAXITER; ++i) {
-		for (int j = 0; j < N; ++j)
-			currTour[j] = j;
-		random_shuffle(currTour, currTour + N);
-		saTSP(currTour);
-		float currLen = tourLen(currTour);
-		//printf("currLen is: %f\n", currLen);
-		if ((minTourDist < 0) ||(currLen < minTourDist)) {
-			minTourDist = currLen;
-			for (int j = 0; j < N; ++j) {
-				minTour[j] = currTour[j];
-			}
-		}
+	int i, j;
+	int *currTour[MAXITER];
+	for (i = 0; i < MAXITER; ++i) {
+		currTour[i] = (int *)malloc(sizeof(int) * N);
+	}
+	pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * MAXITER);
+	//#pragma omp parallel for private(j)
+	for (i = 0; i < MAXITER; ++i) {
+		//int *currTour = (int *)malloc(sizeof(int ) * N);
+		for (j = 0; j < N; ++j)
+			currTour[i][j] = j;
+		if (pthread_create(&threads[i], NULL, routine, (void *)currTour[i]))
+			exit(1);
 	}
 
+	void *status;
+	for (i = 0; i < MAXITER; ++i) {
+		if (pthread_join(threads[i], &status))
+			exit(1);
+		currLen[i] = tourLen(currTour[i]);
+	}
+	
+	int minidx = 0;
+	for (i = 0; i < MAXITER; ++i) {
+		if ((minTourDist < 0) ||(currLen[i] < minTourDist)) {
+			minTourDist = currLen[i];
+			minidx = i;
+		}
+	}
+	for (i = 0; i < N; ++i) {
+		minTour[i] = currTour[minidx][i];
+	}
 	gettimeofday(&stop, NULL);
 	// ------------- Print the result! -----------------
 	int tottime = stop.tv_sec - start.tv_sec;
@@ -217,6 +245,5 @@ int main(int argc, char **argv) {
 		printf("%d \n", minTour[i]+1);
 	}
 	free(minTour);
-	free(currTour);
 	return 0;
 }

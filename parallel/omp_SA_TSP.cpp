@@ -14,6 +14,7 @@
 #include <math.h>
 #include <algorithm>
 #include <sys/time.h>
+#include <omp.h>
 #define MAXITER 20		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
@@ -179,6 +180,7 @@ void saTSP(int* tour) {
 }
 
 int main(int argc, char **argv) {
+	int nprocess = 1;
 	if (argc < 2) {
 		printf("Please enter the filename!\n");
 		return 0;
@@ -186,26 +188,54 @@ int main(int argc, char **argv) {
 	else {
 		loadFile(argv[1]);
 	}
+	if (argc > 2) {
+		nprocess = atoi(argv[2]);
+	}
+	omp_set_num_threads(nprocess);
+	//omp_lock_t mutex;
+	//omp_init_lock(&mutex);
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
 	minTour = (int *)malloc(sizeof(int) * N);
-	int *currTour = (int *)malloc(sizeof(int) * N);
 	srand(time(0));
-	for (int i = 0; i < MAXITER; ++i) {
-		for (int j = 0; j < N; ++j)
-			currTour[j] = j;
-		random_shuffle(currTour, currTour + N);
-		saTSP(currTour);
-		float currLen = tourLen(currTour);
+	int i, j;
+	int *currTour[MAXITER];
+	for (i = 0; i < MAXITER; ++i) {
+		currTour[i] = (int *)malloc(sizeof(int) * N);
+	}
+	float currLen[MAXITER]={};
+	#pragma omp parallel for private(j)
+	for (i = 0; i < MAXITER; ++i) {
+		//int *currTour = (int *)malloc(sizeof(int ) * N);
+		for (j = 0; j < N; ++j)
+			currTour[i][j] = j;
+		random_shuffle(currTour[i], currTour[i] + N);
+		//#pragma omp task
+		saTSP(currTour[i]);
+		//float currLen = tourLen(currTour);
 		//printf("currLen is: %f\n", currLen);
-		if ((minTourDist < 0) ||(currLen < minTourDist)) {
-			minTourDist = currLen;
-			for (int j = 0; j < N; ++j) {
-				minTour[j] = currTour[j];
-			}
-		}
+		//if ((minTourDist < 0) ||(currLen < minTourDist)) {
+		//	omp_set_lock(&mutex);
+		//	minTourDist = currLen;
+		//	for (int j = 0; j < N; ++j) {
+		//		minTour[j] = currTour[j];
+		//	}
+		//	omp_unset_lock(&mutex);
+		//}
+		//free(currTour);
+		currLen[i] = tourLen(currTour[i]);
 	}
 
+	int minidx = 0;
+	for (i = 0; i < MAXITER; ++i) {
+		if ((minTourDist < 0) ||(currLen[i] < minTourDist)) {
+			minTourDist = currLen[i];
+			minidx = i;
+		}
+	}
+	for (i = 0; i < N; ++i) {
+		minTour[i] = currTour[minidx][i];
+	}
 	gettimeofday(&stop, NULL);
 	// ------------- Print the result! -----------------
 	int tottime = stop.tv_sec - start.tv_sec;
@@ -217,6 +247,5 @@ int main(int argc, char **argv) {
 		printf("%d \n", minTour[i]+1);
 	}
 	free(minTour);
-	free(currTour);
 	return 0;
 }

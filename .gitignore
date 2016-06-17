@@ -1,3 +1,6 @@
 *.DS_Store
 *SA_TSP
 *make.sh
+*SA_baseline
+*omp_out
+*pthread_out
