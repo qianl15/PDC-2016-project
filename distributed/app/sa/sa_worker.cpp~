@@ -13,7 +13,7 @@
 
 using namespace std;
 
-const int MAX_SEED = 5;
+const int MAX_SEED = 100;
 const int RELAX = 4000;
 const int MAX_LAST = 3;
 const float EPS = 1E-5;
@@ -112,12 +112,13 @@ bool solve(TSP &seed, float temperature) {
 			for (int k = 0; k <= mid; ++k) {
 				swap(seed.tour[p + k], seed.tour[q - k]);
 			}
-
+/*
 			if (seed.curLen != seed.getLength()) {
 				fprintf(stderr, "p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
 				fprintf(stderr, "wrong! delta %f, %f vs. %f\n", delta, seed.getLength(), seed.curLen);
 				exit(1);
 			}
+*/
 		}
 	}
 
