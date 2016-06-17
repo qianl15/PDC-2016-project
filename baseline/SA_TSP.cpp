@@ -39,8 +39,11 @@ void loadFile(char* filename) {
 	}
 	char buff[200];
 	fscanf(pf, "NAME: %[^\n]s", buff);
+	printf("%s\n", buff);
 	fscanf(pf, "\nTYPE: TSP%[^\n]s", buff);
+	printf("%s\n", buff);
 	fscanf(pf, "\nCOMMENT: %[^\n]s", buff);
+	printf("%s\n", buff);
 	fscanf(pf, "\nDIMENSION: %d", &N);
 	printf("The N is: %d\n", N);
 	fscanf(pf, "\nEDGE_WEIGHT_TYPE: %[^\n]s", buff);
@@ -70,7 +73,11 @@ void loadFile(char* filename) {
 	}
 	else if (strcmp(buff, "EXPLICIT") == 0) {
 		fscanf(pf, "\nEDGE_WEIGHT_FORMAT: %[^\n]s", buff);
-		fscanf(pf, "\nEDGE_WEIGHT_SECTION");
+		fscanf(pf, "\n%[^\n]s", buff);
+		char *disps = strstr(buff, "DISPLAY_DATA_TYPE");
+		if (disps != NULL) {
+			fscanf(pf, "\nEDGE_WEIGHT_SECTION");
+		}
 		float weight;
 		for (int i = 0; i < N; ++i) {
 			for (int j = 0; j <= i; ++j) {
