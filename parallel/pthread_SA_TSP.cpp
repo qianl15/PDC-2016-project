@@ -14,8 +14,9 @@
 #include <math.h>
 #include <algorithm>
 #include <sys/time.h>
+#include <pthread.h>
 #include <omp.h>
-#define MAXITER 20		// Proposal 20 routes and then select the best one
+#define MAXITER 5		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
 #define RELAX 4000		// The times of relaxation of the same temperature
@@ -30,6 +31,7 @@ float minTourDist = -1;		// The distance of shortest path
 int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
+float currLen[MAXITER]={};
 
 /* load the data */
 void loadFile(char* filename) {
@@ -179,6 +181,11 @@ void saTSP(int* tour) {
 	return;
 }
 
+void *routine(void *tour) {
+	random_shuffle((int *)tour, (int *)tour + N);
+	saTSP((int *)tour);
+}
+
 int main(int argc, char **argv) {
 	int nprocess = 1;
 	if (argc < 2) {
@@ -191,9 +198,6 @@ int main(int argc, char **argv) {
 	if (argc > 2) {
 		nprocess = atoi(argv[2]);
 	}
-	omp_set_num_threads(nprocess);
-	//omp_lock_t mutex;
-	//omp_init_lock(&mutex);
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
 	minTour = (int *)malloc(sizeof(int) * N);
@@ -203,29 +207,23 @@ int main(int argc, char **argv) {
 	for (i = 0; i < MAXITER; ++i) {
 		currTour[i] = (int *)malloc(sizeof(int) * N);
 	}
-	float currLen[MAXITER]={};
-	#pragma omp parallel for private(j)
+	pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * MAXITER);
+	//#pragma omp parallel for private(j)
 	for (i = 0; i < MAXITER; ++i) {
 		//int *currTour = (int *)malloc(sizeof(int ) * N);
 		for (j = 0; j < N; ++j)
 			currTour[i][j] = j;
-		random_shuffle(currTour[i], currTour[i] + N);
-		//#pragma omp task
-		saTSP(currTour[i]);
-		//float currLen = tourLen(currTour);
-		//printf("currLen is: %f\n", currLen);
-		//if ((minTourDist < 0) ||(currLen < minTourDist)) {
-		//	omp_set_lock(&mutex);
-		//	minTourDist = currLen;
-		//	for (int j = 0; j < N; ++j) {
-		//		minTour[j] = currTour[j];
-		//	}
-		//	omp_unset_lock(&mutex);
-		//}
-		//free(currTour);
-		currLen[i] = tourLen(currTour[i]);
+		if (pthread_create(&threads[i], NULL, routine, (void *)currTour[i]))
+			exit(1);
 	}
 
+	void *status;
+	for (i = 0; i < MAXITER; ++i) {
+		if (pthread_join(threads[i], &status))
+			exit(1);
+		currLen[i] = tourLen(currTour[i]);
+	}
+	
 	int minidx = 0;
 	for (i = 0; i < MAXITER; ++i) {
 		if ((minTourDist < 0) ||(currLen[i] < minTourDist)) {

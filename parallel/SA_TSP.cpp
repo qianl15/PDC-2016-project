@@ -14,16 +14,15 @@
 #include <math.h>
 #include <algorithm>
 #include <sys/time.h>
-#define MAXITER 200		// Proposal 200 routes and then select the best one
+#define MAXITER 5		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
-#define RELAX 40000		// The times of relaxation of the same temperature
+#define RELAX 4000		// The times of relaxation of the same temperature
 #define ALPHA 0.999		// Cooling rate
 #define INITEMP 99.0	// Initial temperature
 #define STOPTEMP 0.001	// Termination temperature
 #define MAXLAST 3		// Stop if the tour length keeps unchanged for MAXLAST consecutive temperature
 #define MAXN 1000		// only support N <= 1000
-#define EPS 1e-5
 using namespace std;
 
 float minTourDist = -1;		// The distance of shortest path
@@ -42,8 +41,11 @@ void loadFile(char* filename) {
 	}
 	char buff[200];
 	fscanf(pf, "NAME: %[^\n]s", buff);
+	printf("%s\n", buff);
 	fscanf(pf, "\nTYPE: TSP%[^\n]s", buff);
+	printf("%s\n", buff);
 	fscanf(pf, "\nCOMMENT: %[^\n]s", buff);
+	printf("%s\n", buff);
 	fscanf(pf, "\nDIMENSION: %d", &N);
 	printf("The N is: %d\n", N);
 	fscanf(pf, "\nEDGE_WEIGHT_TYPE: %[^\n]s", buff);
@@ -73,7 +75,11 @@ void loadFile(char* filename) {
 	}
 	else if (strcmp(buff, "EXPLICIT") == 0) {
 		fscanf(pf, "\nEDGE_WEIGHT_FORMAT: %[^\n]s", buff);
-		fscanf(pf, "\nEDGE_WEIGHT_SECTION");
+		fscanf(pf, "\n%[^\n]s", buff);
+		char *disps = strstr(buff, "DISPLAY_DATA_TYPE");
+		if (disps != NULL) {
+			fscanf(pf, "\nEDGE_WEIGHT_SECTION");
+		}
 		float weight;
 		for (int i = 0; i < N; ++i) {
 			for (int j = 0; j <= i; ++j) {
@@ -89,7 +95,7 @@ void loadFile(char* filename) {
 /* Calculate the length of the tour */
 float tourLen(int *tour) {
 	if (tour == NULL) {
-		fprintf(stderr, "tour not exist!\n");
+		printf("tour not exist!\n");
 		return -1;
 	}
 	float cnt = 0;
@@ -110,12 +116,15 @@ void saTSP(int* tour) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
 		for (int i = 0; i < RELAX; ++i) {
+			/* generate a random r to determine the proposal */
+			//float r = ((float) rand()) / (float)RAND_MAX;
+
 			/* Proposal 1: Block Reverse between p and q */
-			int p = rand() % N, q = rand() % N;
+			int p = rand()%N, q = rand()%N;
 			// If will occur error if p=0 q=N-1...
-			if (abs(p - q) == N - 1) {
-				q = rand() % (N - 1);
-				p = rand() % (N - 2);
+			if (abs(p - q) == N-1) {
+				q = rand()%(N-1);
+				p = rand()%(N-2);
 			}
 			if (p == q) {
 				q = (q + 2) % N;
@@ -142,39 +151,40 @@ void saTSP(int* tour) {
 					tour[q-k] = tmp;
 				}
 				
-				if (currLen != tourLen(tour)) {
-					fprintf(stderr, "p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
-					fprintf(stderr, "wrong! delta %f, %f vs. %f\n", delta, tourLen(tour), currLen);
-					return;
-				}
+				//if (fabs(currLen - tourLen(tour)) > 1) {
+				//	printf("p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
+				//	printf("wrong! delta %f, %f vs. %f\n", delta, tourLen(tour), currLen);
+				//	return;
+				//}
+				currLen = tourLen(tour);
 			}
 
 		}
 
-		if (fabs(currLen - lastLen) < EPS) {
+		if (fabs(currLen - lastLen) < 1e-5) {
 			contCnt += 1;
 			if (contCnt >= MAXLAST) {
 				//printf("unchanged for %d times1!\n", contCnt);
 				break;
 			}
 		}
-		else {
+		else
 			contCnt = 0;
-		}
 		lastLen = currLen;
 	}
+	
+
 
 	return;
 }
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
-		fprintf(stderr, "Usage: ./%s input_filename!\n", argv[0]);
-		exit(1);
+		printf("Please enter the filename!\n");
+		return 0;
 	}
 	else {
 		loadFile(argv[1]);
-		fprintf(stderr, "Finish loading.");
 	}
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);

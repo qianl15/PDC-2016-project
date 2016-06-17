@@ -151,11 +151,12 @@ void saTSP(int* tour) {
 					tour[q-k] = tmp;
 				}
 				
-				if (fabs(currLen - tourLen(tour)) > 1) {
-					printf("p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
-					printf("wrong! delta %f, %f vs. %f\n", delta, tourLen(tour), currLen);
-					return;
-				}
+				//if (fabs(currLen - tourLen(tour)) > 1) {
+				//	printf("p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
+				//	printf("wrong! delta %f, %f vs. %f\n", delta, tourLen(tour), currLen);
+				//	return;
+				//}
+				currLen = tourLen(tour);
 			}
 
 		}
