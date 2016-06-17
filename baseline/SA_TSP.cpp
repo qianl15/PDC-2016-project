@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <algorithm>
+#include <sys/time.h>
 #define MAXITER 200		// Proposal 200 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
@@ -32,6 +33,7 @@ float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
 /* load the data */
 void loadFile(char* filename) {
 	FILE *pf;
+
 	pf = fopen(filename, "r");
 	if (pf == NULL) {
 		printf("Cannot open the file!\n");
@@ -165,6 +167,8 @@ void saTSP(int* tour) {
 				break;
 			}
 		}
+		else
+			contCnt = 0;
 		lastLen = currLen;
 	}
 	
@@ -181,6 +185,8 @@ int main(int argc, char **argv) {
 	else {
 		loadFile(argv[1]);
 	}
+	struct timeval start, stop;
+	gettimeofday(&start, NULL);
 	minTour = (int *)malloc(sizeof(int) * N);
 	int *currTour = (int *)malloc(sizeof(int) * N);
 	srand(time(0));
@@ -199,7 +205,12 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	gettimeofday(&stop, NULL);
 	// ------------- Print the result! -----------------
+	int tottime = stop.tv_sec - start.tv_sec;
+	int timemin = tottime / 60;
+	int timesec = tottime % 60;
+	printf("Total time usage: %d min %d sec. \n", timemin, timesec);
 	printf("The shortest length is: %f\n And the tour is: \n", minTourDist);
 	for (int i = 0; i < N; ++i) {
 		printf("%d \n", minTour[i]+1);
