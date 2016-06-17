@@ -27,6 +27,13 @@ int main() {
 	while (true) {
 		temperature *= RATIO;
 		communicator.gatherMaster(seedCount);
+
+		cerr << temperature;
+		for (int i = 1; i < n; ++i) {
+			cerr << ' ' << seedCount[i];
+		}
+		cerr << endl;
+
 		int sum = 0;
 		for (int i = 1; i < n; ++i) {
 			sum += seedCount[i];

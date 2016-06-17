@@ -13,7 +13,7 @@
 
 using namespace std;
 
-const int MAX_SEED = 300;
+const int MAX_SEED = 500;
 const int RELAX = 4000;
 const int MAX_LAST = 3;
 const float EPS = 1E-5;
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
 	loadFile(argv[1]);
 	barrier();
 
-	srand(time(NULL));
+	srand(time(NULL) + getWorkerID());
 	Communicator<TSP> communicator;
 	seeds.resize(MAX_SEED);
 
@@ -171,6 +171,7 @@ int main(int argc, char *argv[]) {
 				seeds.pop_back();
 			}
 		}
+		cerr << getWorkerID() << ' ' << seeds.size() << endl;
 		communicator.syncBuffer();
 	}
 
