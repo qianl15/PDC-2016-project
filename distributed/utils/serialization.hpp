@@ -2,19 +2,16 @@
 #define UTILS_SERIALIZATION_HPP_
 
 #include <vector>
-#include <set>
 #include <string>
-#include <map>
+
 #include "global.hpp"
 
-using namespace std;
-
-class ibinstream {
+class obinstream {
 	private:
-		vector<char> buf;
+		std::vector<char> buf;
 
 	public:
-		char* get_buf() {
+		char *getBuffer() {
 			return &buf[0];
 		}
 
@@ -22,273 +19,165 @@ class ibinstream {
 			return buf.size();
 		}
 
-		void raw_byte(char c) {
+		void rawByte(char c) {
 			buf.push_back(c);
 		}
 
-		void raw_bytes(const void* ptr, int size) {
-			buf.insert(buf.end(), (const char*) ptr, (const char*) ptr + size);
+		void rawBytes(const void *ptr, int size) {
+			buf.insert(buf.end(), (const char *)ptr, (const char *)ptr + size);
 		}
 };
 
-ibinstream& operator<<(ibinstream& m, size_t i) { //unsigned int
-	m.raw_bytes(&i, sizeof(size_t));
-	return m;
+obinstream &operator<<(obinstream &bout, bool i) {
+	bout.rawBytes(&i, sizeof(bool));
+	return bout;
 }
 
-ibinstream& operator<<(ibinstream& m, bool i) {
-	m.raw_bytes(&i, sizeof(bool));
-	return m;
+obinstream &operator<<(obinstream &bin, char c) {
+	bin.rawByte(c);
+	return bin;
 }
 
-ibinstream& operator<<(ibinstream& m, int i) {
-	m.raw_bytes(&i, sizeof(int));
-	return m;
+obinstream &operator<<(obinstream &bout, int i) {
+	bout.rawBytes(&i, sizeof(int));
+	return bout;
 }
 
-ibinstream& operator<<(ibinstream& m, double i) {
-	m.raw_bytes(&i, sizeof(double));
-	return m;
+obinstream &operator<<(obinstream &bout, size_t i) {
+	bout.rawBytes(&i, sizeof(size_t));
+	return bout;
 }
 
-ibinstream& operator<<(ibinstream& m, char c) {
-	m.raw_byte(c);
-	return m;
+obinstream &operator<<(obinstream &bout, float i) {
+	bout.rawBytes(&i, sizeof(float));
+	return bout;
+}
+
+obinstream &operator<<(obinstream &bout, double i) {
+	bout.rawBytes(&i, sizeof(double));
+	return bout;
 }
 
 template<class T1, class T2>
-ibinstream& operator<<(ibinstream &m, const pair<T1, T2> &p) {
-	m << p.first;
-	m << p.second;
-	return m;
+obinstream &operator<<(obinstream &bout, const std::pair<T1, T2> &p) {
+	bout << p.first;
+	bout << p.second;
+	return bout;
 }
 
 template<class T>
-ibinstream& operator<<(ibinstream& m, const T* p) {
-	return m << *p;
-}
-
-template<class T>
-ibinstream& operator<<(ibinstream& m, const vector<T>& v) {
-	m << v.size();
-	for (typename vector<T>::const_iterator it = v.begin(); it != v.end();
-			++it) {
-		m << *it;
+obinstream &operator<<(obinstream &bout, const std::vector<T> &v) {
+	bout << v.size();
+	for (auto &e: v) {
+		bout << e;
 	}
-	return m;
+	return bout;
 }
 
-template<>
-ibinstream& operator<<(ibinstream& m, const vector<int>& v) {
-	m << v.size();
-	m.raw_bytes(&v[0], v.size() * sizeof(int));
-	return m;
+obinstream &operator<<(obinstream &bout, const std::vector<int> &v) {
+	bout << v.size();
+	bout.rawBytes(&v[0], v.size() * sizeof(int));
+	return bout;
 }
 
-template<>
-ibinstream& operator<<(ibinstream& m, const vector<double>& v) {
-	m << v.size();
-	m.raw_bytes(&v[0], v.size() * sizeof(double));
-	return m;
+obinstream &operator<<(obinstream &bout, const std::vector<float> &v) {
+	bout << v.size();
+	bout.rawBytes(&v[0], v.size() * sizeof(float));
+	return bout;
 }
 
-template<class T>
-ibinstream& operator<<(ibinstream& m, const set<T>& v) {
-	m << v.size();
-	for (typename set<T>::const_iterator it = v.begin(); it != v.end(); ++it) {
-		m << *it;
-	}
-	return m;
-}
-
-ibinstream& operator<<(ibinstream& m, const string& str) {
-	m << str.length();
-	m.raw_bytes(str.c_str(), str.length());
-	return m;
-}
-
-template<class KeyT, class ValT>
-ibinstream& operator<<(ibinstream& m, const map<KeyT, ValT>& v) {
-	m << v.size();
-	for (typename map<KeyT, ValT>::const_iterator it = v.begin(); it != v.end();
-			++it) {
-		m << it->first;
-		m << it->second;
-	}
-	return m;
-}
-
-template<class KeyT, class ValT>
-ibinstream& operator<<(ibinstream& m, const unordered_map<KeyT, ValT>& v) {
-	m << v.size();
-	for (typename unordered_map<KeyT, ValT>::const_iterator it = v.begin(); it != v.end(); ++it) {
-		m << it->first;
-		m << it->second;
-	}
-	return m;
-}
-
-template<class T>
-ibinstream& operator<<(ibinstream& m, const unordered_set<T>& v) {
-	m << v.size();
-	for (typename unordered_set<T>::const_iterator it = v.begin(); it != v.end(); ++it) {
-		m << *it;
-	}
-	return m;
-}
-
-class obinstream {
+class ibinstream {
 	private:
-		char* buf; //responsible for deleting the buffer, do not delete outside
+		char *buf; //responsible for deleting the buffer, do not delete outside
 		size_t size;
-		size_t index;
+		size_t idx;
 
 	public:
-		obinstream(char* b, size_t s): buf(b), size(s), index(0) {
+		ibinstream(char *_buf, size_t _size): buf(_buf), size(_size), idx(0) {
 		}
 
-		obinstream(char* b, size_t s, size_t idx): buf(b), size(s), index(idx) {
+		ibinstream(char *_buf, size_t _size, size_t _idx): buf(_buf), size(_size), idx(_idx) {
 		}
 
-		~obinstream() {
-			delete[] buf;
+		~ibinstream() {
+			delete []buf;
 		}
 
-		char raw_byte() {
-			return buf[index++];
+		char rawByte() {
+			return buf[idx++];
 		}
 
-		void* raw_bytes(unsigned int n_bytes) {
-			char* ret = buf + index;
-			index += n_bytes;
+		void *rawBytes(unsigned int n) {
+			char *ret = buf + idx;
+			idx += n;
 			return ret;
 		}
 };
 
-obinstream& operator>>(obinstream& m, size_t& i) {
-	i = *(size_t*) m.raw_bytes(sizeof(size_t));
-	return m;
+ibinstream &operator>>(ibinstream &bin, bool &i) {
+	i = *(bool *)bin.rawBytes(sizeof(bool));
+	return bin;
 }
 
-obinstream& operator>>(obinstream& m, bool& i) {
-	i = *(bool*) m.raw_bytes(sizeof(bool));
-	return m;
+ibinstream &operator>>(ibinstream &bin, char &c) {
+	c = bin.rawByte();
+	return bin;
 }
 
-obinstream& operator>>(obinstream& m, int& i) {
-	i = *(int*) m.raw_bytes(sizeof(int));
-	return m;
+ibinstream &operator>>(ibinstream &bin, int &i) {
+	i = *(int *)bin.rawBytes(sizeof(int));
+	return bin;
 }
 
-obinstream& operator>>(obinstream& m, double& i) {
-	i = *(double*) m.raw_bytes(sizeof(double));
-	return m;
+ibinstream &operator>>(ibinstream &bin, size_t &i) {
+	i = *(size_t *)bin.rawBytes(sizeof(size_t));
+	return bin;
 }
 
-obinstream& operator>>(obinstream& m, char& c) {
-	c = m.raw_byte();
-	return m;
+ibinstream &operator>>(ibinstream &bin, float &i) {
+	i = *(float *)bin.rawBytes(sizeof(float));
+	return bin;
+}
+
+ibinstream &operator>>(ibinstream &bin, double &i) {
+	i = *(double *)bin.rawBytes(sizeof(double));
+	return bin;
 }
 
 template<class T1, class T2>
-obinstream& operator>>(obinstream &m, pair<T1, T2> &p) {
-	m >> p.first;
-	m >> p.second;
-	return m;
+ibinstream &operator>>(ibinstream &bin, std::pair<T1, T2> &p) {
+	bin >> p.first;
+	bin >> p.second;
+	return bin;
 }
 
 template<class T>
-obinstream& operator>>(obinstream& m, T*& p) {
-	p = new T;
-	return m >> (*p);
-}
-
-template<class T>
-obinstream& operator>>(obinstream& m, vector<T>& v) {
+ibinstream &operator>>(ibinstream &bin, std::vector<T> &v) {
 	size_t size;
-	m >> size;
+	bin >> size;
 	v.resize(size);
-	for (typename vector<T>::iterator it = v.begin(); it != v.end(); ++it) {
-		m >> *it;
+	for (typename std::vector<T>::iterator it = v.begin(); it != v.end(); ++it) {
+		bin >> *it;
 	}
-	return m;
+	return bin;
 }
 
-template<>
-obinstream& operator>>(obinstream& m, vector<int>& v) {
+ibinstream &operator>>(ibinstream &bin, std::vector<int> &v) {
 	size_t size;
-	m >> size;
+	bin >> size;
 	v.resize(size);
-	int* data = (int*) m.raw_bytes(sizeof(int) * size);
+	int *data = (int *)bin.rawBytes(sizeof(int) * size);
 	v.assign(data, data + size);
-	return m;
+	return bin;
 }
 
-template<>
-obinstream& operator>>(obinstream& m, vector<double>& v) {
+ibinstream &operator>>(ibinstream &bin, std::vector<float> &v) {
 	size_t size;
-	m >> size;
+	bin >> size;
 	v.resize(size);
-	double* data = (double*) m.raw_bytes(sizeof(double) * size);
+	float *data = (float *)bin.rawBytes(sizeof(float) * size);
 	v.assign(data, data + size);
-	return m;
-}
-
-template<class T>
-obinstream& operator>>(obinstream& m, set<T>& v) {
-	size_t size;
-	m >> size;
-	for (size_t i = 0; i < size; i++) {
-		T tmp;
-		m >> tmp;
-		v.insert(v.end(), tmp);
-	}
-	return m;
-}
-
-obinstream& operator>>(obinstream& m, string& str) {
-	size_t length;
-	m >> length;
-	str.clear();
-	char* data = (char*) m.raw_bytes(length);
-	str.append(data, length);
-	return m;
-}
-
-template<class KeyT, class ValT>
-obinstream& operator>>(obinstream& m, map<KeyT, ValT>& v) {
-	size_t size;
-	m >> size;
-	for (int i = 0; i < size; i++) {
-		KeyT key;
-		m >> key;
-		m >> v[key];
-	}
-	return m;
-}
-
-template<class KeyT, class ValT>
-obinstream& operator>>(obinstream& m, unordered_map<KeyT, ValT>& v) {
-	size_t size;
-	m >> size;
-	for (int i = 0; i < size; i++) {
-		KeyT key;
-		m >> key;
-		m >> v[key];
-	}
-	return m;
-}
-
-template<class T>
-obinstream& operator>>(obinstream& m, unordered_set<T>& v) {
-	size_t size;
-	m >> size;
-	for (int i = 0; i < size; i++) {
-		T key;
-		m >> key;
-		v.insert(key);
-	}
-	return m;
+	return bin;
 }
 
 #endif /* UTILS_SERIALIZATION_HPP_ */

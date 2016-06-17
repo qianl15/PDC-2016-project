@@ -1,0 +1,210 @@
+#include <iostream>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <ctime>
+#include <cstring>
+#include <vector>
+#include <algorithm>
+
+#include "../../utils/global.hpp"
+#include "../../utils/Communicator.hpp"
+
+using namespace std;
+
+const int N = 1000;
+const int MAX_SEED = 20;
+const int RELAX = 4000;
+const int MAX_LAST = 3;
+const float INIT_TEMP = 99.0;
+const float STOP_TEMP = 0.001;
+const float RATIO = 0.999;
+const float EPS = 1E-5;
+
+float dist[N][N];
+int n;
+
+class TSP {
+	public:
+		TSP(): contCnt(0) {
+			for (int i = 0; i < n; ++i) {
+				tour.push_back(i);
+			}
+			random_shuffle(tour.begin(), tour.end());
+			preLen = curLen = getLength();
+			halt = false;
+		}
+
+		float getLength() {
+			float ret = 0.0;
+			for (int i = 1; i < n; ++i) {
+				ret += dist[tour[i - 1]][tour[i]];
+			}
+			ret += dist[tour.back()][tour[0]];
+			return ret;
+		}
+
+		void output() {
+			printf("The shortest length is: %f\nAnd the tour is:", curLen);
+			for (int i = 0; i < n; ++i) {
+				printf(" %d", tour[i] + 1);
+			}
+			printf("\n");
+		}
+
+		vector<int> tour;
+		float curLen, preLen;
+		int contCnt;
+		bool halt;
+
+		static int deadCount;
+};
+vector<TSP> seeds;
+
+/* load the data */
+void loadFile(char* filename) {
+	FILE *pf;
+
+	pf = fopen(filename, "r");
+	if (pf == NULL) {
+		printf("Cannot open the file!\n");
+		exit(1);
+	}
+	char buff[200];
+	fscanf(pf, "NAME: %[^\n]s", buff);
+	printf("%s\n", buff);
+	fscanf(pf, "\nTYPE: TSP%[^\n]s", buff);
+	printf("%s\n", buff);
+	fscanf(pf, "\nCOMMENT: %[^\n]s", buff);
+	printf("%s\n", buff);
+	fscanf(pf, "\nDIMENSION: %d", &n);
+	printf("The N is: %d\n", n);
+	fscanf(pf, "\nEDGE_WEIGHT_TYPE: %[^\n]s", buff);
+	printf("the type is: %s\n", buff);
+	memset(dist, 0, sizeof(dist));
+	if (strcmp(buff, "EUC_2D") == 0) {
+		fscanf(pf, "\nNODE_COORD_SECTION");
+		float nodeCoord[N][2] = {};
+		int nid;
+		float xx, yy;
+		for (int i = 0; i < N; ++i) {
+			fscanf(pf, "\n%d %f %f", &nid, &xx, &yy);
+			nodeCoord[i][0] = xx;
+			nodeCoord[i][1] = yy;
+		}
+		float xi, yi, xj, yj;
+		for (int i = 0; i < N; ++i) {
+			for (int j = i + 1; j < N; ++j) {
+				xi = nodeCoord[i][0];
+				yi = nodeCoord[i][1];
+				xj = nodeCoord[j][0];
+				yj = nodeCoord[j][1];
+				dist[i][j] = (float)sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj));
+				dist[j][i] = dist[i][j];
+			}
+		}
+	}
+	else if (strcmp(buff, "EXPLICIT") == 0) {
+		fscanf(pf, "\nEDGE_WEIGHT_FORMAT: %[^\n]s", buff);
+		fscanf(pf, "\n%[^\n]s", buff);
+		char *disps = strstr(buff, "DISPLAY_DATA_TYPE");
+		if (disps != NULL) {
+			fscanf(pf, "\nEDGE_WEIGHT_SECTION");
+		}
+		float weight;
+		for (int i = 0; i < N; ++i) {
+			for (int j = 0; j <= i; ++j) {
+				fscanf(pf, "%f", &weight);
+				dist[i][j] = weight;
+				dist[j][i] = weight;
+			}
+		}
+	}
+	return;
+}
+
+bool solve(TSP &seed, float temperature) {
+	/* stay in the same temperature for RELAX times */
+	for (int i = 0; i < RELAX; ++i) {
+		/* Proposal 1: Block Reverse between p and q */
+		int p = rand() % n, q = rand() % n;
+		// If will occur error if p=0 q=N-1...
+		if (abs(p - q) == n - 1) {
+			q = rand() % (n - 1);
+			p = rand() % (n - 2);
+		}
+		if (p == q) {
+			q = (q + 2) % n;
+		}
+		if (p > q) {
+			swap(p, q);
+		}
+		int p1 = (p - 1 + n) % n, q1 = (q + 1) % n;
+		int tp = seed.tour[p], tq = seed.tour[q], tp1 = seed.tour[p1], tq1 = seed.tour[q1];
+		float delta = dist[tp][tq1] + dist[tp1][tq] - dist[tp][tp1] - dist[tq][tq1];
+		/* whether to accept the change */
+		if ((delta < 0) || ((delta > 0) && (exp(-delta / temperature) > (float)rand() / RAND_MAX))) {
+			seed.curLen = seed.curLen + delta;
+			int mid = (q - p) >> 1;
+			int tmp;
+			for (int k = 0; k <= mid; ++k) {
+				swap(seed.tour[p + k], seed.tour[q - k]);
+			}
+
+			if (seed.curLen != seed.getLength()) {
+				fprintf(stderr, "p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
+				fprintf(stderr, "wrong! delta %f, %f vs. %f\n", delta, seed.getLength(), seed.curLen);
+				exit(1);
+			}
+		}
+	}
+
+	if (fabs(seed.curLen - seed.preLen) < EPS) {
+		++seed.contCnt;
+		if (seed.contCnt == MAX_LAST) {
+			return false;
+		}
+	} else {
+		seed.contCnt = 0;
+	}
+	seed.preLen = seed.curLen;
+	return true;
+}
+
+int main(int argc, char *argv[]) {
+	if (argc < 2) {
+		fprintf(stderr, "Usage: ./%s input_filename.\n", argv[0]);
+		exit(1);
+	}
+	loadFile(argv[1]);
+
+	cerr << "Finish loading." << endl;
+
+	srand(time(NULL));
+	seeds.resize(MAX_SEED);
+
+	vector<TSP> tmpSeeds, terminated;
+	float temperature = INIT_TEMP;
+	while (temperature > STOP_TEMP && !seeds.empty()) {
+		temperature *= RATIO;
+		for (int i = 0; i < (int)seeds.size(); ++i) {
+			if (solve(seeds[i], temperature)) {
+				tmpSeeds.push_back(seeds[i]);
+			} else {
+				terminated.push_back(seeds[i]);
+			}
+		}
+		seeds = tmpSeeds;
+		tmpSeeds.clear();
+	}
+
+	int k = 0;
+	for (int i = 1; i < MAX_SEED; ++i) {
+		if (terminated[i].curLen < terminated[k].curLen) {
+			k = i;
+		}
+	}
+	terminated[k].output();
+
+	return 0;
+}
