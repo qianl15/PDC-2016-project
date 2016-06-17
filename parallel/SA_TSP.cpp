@@ -14,10 +14,10 @@
 #include <math.h>
 #include <algorithm>
 #include <sys/time.h>
-#define MAXITER 5		// Proposal 20 routes and then select the best one
+#define MAXITER 20		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
-#define RELAX 4000		// The times of relaxation of the same temperature
+#define RELAX 40000		// The times of relaxation of the same temperature
 #define ALPHA 0.999		// Cooling rate
 #define INITEMP 99.0	// Initial temperature
 #define STOPTEMP 0.001	// Termination temperature
@@ -116,9 +116,6 @@ void saTSP(int* tour) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
 		for (int i = 0; i < RELAX; ++i) {
-			/* generate a random r to determine the proposal */
-			//float r = ((float) rand()) / (float)RAND_MAX;
-
 			/* Proposal 1: Block Reverse between p and q */
 			int p = rand()%N, q = rand()%N;
 			// If will occur error if p=0 q=N-1...
@@ -150,18 +147,12 @@ void saTSP(int* tour) {
 					tour[p+k] = tour[q-k];
 					tour[q-k] = tmp;
 				}
-				
-				//if (fabs(currLen - tourLen(tour)) > 1) {
-				//	printf("p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
-				//	printf("wrong! delta %f, %f vs. %f\n", delta, tourLen(tour), currLen);
-				//	return;
-				//}
-				currLen = tourLen(tour);
+				//currLen = tourLen(tour);
 			}
 
 		}
 
-		if (fabs(currLen - lastLen) < 1e-5) {
+		if (fabs(currLen - lastLen) < 1e-3) {
 			contCnt += 1;
 			if (contCnt >= MAXLAST) {
 				//printf("unchanged for %d times1!\n", contCnt);
@@ -172,9 +163,6 @@ void saTSP(int* tour) {
 			contCnt = 0;
 		lastLen = currLen;
 	}
-	
-
-
 	return;
 }
 

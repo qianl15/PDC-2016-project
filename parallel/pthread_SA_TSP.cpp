@@ -16,10 +16,10 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <omp.h>
-#define MAXITER 5		// Proposal 20 routes and then select the best one
+#define MAXITER 20		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
-#define RELAX 4000		// The times of relaxation of the same temperature
+#define RELAX 40000		// The times of relaxation of the same temperature
 #define ALPHA 0.999		// Cooling rate
 #define INITEMP 99.0	// Initial temperature
 #define STOPTEMP 0.001	// Termination temperature
@@ -32,6 +32,10 @@ int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
 float currLen[MAXITER]={};
+int *currTour[MAXITER]={};
+int nprocess = 1;
+int globalIter = -1;	// global iteration count
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* load the data */
 void loadFile(char* filename) {
@@ -119,9 +123,6 @@ void saTSP(int* tour) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
 		for (int i = 0; i < RELAX; ++i) {
-			/* generate a random r to determine the proposal */
-			//float r = ((float) rand()) / (float)RAND_MAX;
-
 			/* Proposal 1: Block Reverse between p and q */
 			int p = rand()%N, q = rand()%N;
 			// If will occur error if p=0 q=N-1...
@@ -153,18 +154,12 @@ void saTSP(int* tour) {
 					tour[p+k] = tour[q-k];
 					tour[q-k] = tmp;
 				}
-				
-				//if (fabs(currLen - tourLen(tour)) > 1) {
-				//	printf("p q p1 q1 is: %d %d %d %d\n", p, q, p1, q1);
-				//	printf("wrong! delta %f, %f vs. %f\n", delta, tourLen(tour), currLen);
-				//	return;
-				//}
-				currLen = tourLen(tour);
+				//currLen = tourLen(tour);
 			}
 
 		}
 
-		if (fabs(currLen - lastLen) < 1e-5) {
+		if (fabs(currLen - lastLen) < 1e-2) {
 			contCnt += 1;
 			if (contCnt >= MAXLAST) {
 				//printf("unchanged for %d times1!\n", contCnt);
@@ -176,18 +171,37 @@ void saTSP(int* tour) {
 		lastLen = currLen;
 	}
 	
-
-
 	return;
 }
 
-void *routine(void *tour) {
-	random_shuffle((int *)tour, (int *)tour + N);
-	saTSP((int *)tour);
+void *routine(void *idx) {
+	long tid = (long)idx;
+	int *localMin = (int *)malloc(sizeof(int) * N);
+	int *tour = currTour[tid];
+	float localMinDist = -1;
+	int localIter = -1;
+	for (int i = 0; i < MAXITER; ++i) {
+		pthread_mutex_lock(&mutex);
+		globalIter++;
+		localIter = globalIter;
+		pthread_mutex_unlock(&mutex);
+		if (localIter >= MAXITER) {
+			break;
+		}
+		random_shuffle((int *)tour, (int *)tour + N);
+		saTSP((int *)tour);
+		int len = tourLen(tour);
+		if ((len < localMinDist) || (localMinDist < 0)) {
+			localMinDist = len;
+			memcpy(localMin, tour, sizeof(int) * N);
+		}
+	}
+	memcpy(tour, localMin, sizeof(int) * N);
+	free(localMin);
+	return NULL;
 }
 
 int main(int argc, char **argv) {
-	int nprocess = 1;
 	if (argc < 2) {
 		printf("Please enter the filename!\n");
 		return 0;
@@ -197,44 +211,51 @@ int main(int argc, char **argv) {
 	}
 	if (argc > 2) {
 		nprocess = atoi(argv[2]);
+		if (nprocess > N) {
+			nprocess = N;
+		}
 	}
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
-	minTour = (int *)malloc(sizeof(int) * N);
 	srand(time(0));
-	int i, j;
-	int *currTour[MAXITER];
-	for (i = 0; i < MAXITER; ++i) {
+	minTour = (int *)malloc(sizeof(int) * N);
+	pthread_mutex_init(&mutex, NULL);
+
+	/* create "nprocess" threads and work! */
+	pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * nprocess);
+	for (int i = 0; i < nprocess; ++i) {
 		currTour[i] = (int *)malloc(sizeof(int) * N);
-	}
-	pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * MAXITER);
-	//#pragma omp parallel for private(j)
-	for (i = 0; i < MAXITER; ++i) {
-		//int *currTour = (int *)malloc(sizeof(int ) * N);
-		for (j = 0; j < N; ++j)
+		for (int j = 0; j < N; ++j)
 			currTour[i][j] = j;
-		if (pthread_create(&threads[i], NULL, routine, (void *)currTour[i]))
+		if (pthread_create(&threads[i], NULL, routine, (void *)i)) {
+			fprintf(stderr, "Fail to create thread!\n");
 			exit(1);
+		}
 	}
 
+	/* join all the threads */
 	void *status;
-	for (i = 0; i < MAXITER; ++i) {
-		if (pthread_join(threads[i], &status))
+	for (int i = 0; i < nprocess; ++i) {
+		if (pthread_join(threads[i], &status)) {
+			fprintf(stderr, "Fail to create thread!\n");
 			exit(1);
+		}
 		currLen[i] = tourLen(currTour[i]);
 	}
 	
+	/* find the minimal answer */
 	int minidx = 0;
-	for (i = 0; i < MAXITER; ++i) {
-		if ((minTourDist < 0) ||(currLen[i] < minTourDist)) {
+	for (int i = 0; i < nprocess; ++i) {
+		if ((currLen[i] < minTourDist) || (minTourDist < 0)) {
 			minTourDist = currLen[i];
 			minidx = i;
 		}
 	}
-	for (i = 0; i < N; ++i) {
+	for (int i = 0; i < N; ++i) {
 		minTour[i] = currTour[minidx][i];
 	}
 	gettimeofday(&stop, NULL);
+
 	// ------------- Print the result! -----------------
 	int tottime = stop.tv_sec - start.tv_sec;
 	int timemin = tottime / 60;
@@ -245,5 +266,8 @@ int main(int argc, char **argv) {
 		printf("%d \n", minTour[i]+1);
 	}
 	free(minTour);
+	for (int i = 0; i < nprocess; ++i)
+		free(currTour[i]);
+	pthread_mutex_destroy(&mutex);
 	return 0;
 }

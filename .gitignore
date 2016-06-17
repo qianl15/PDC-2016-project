@@ -4,3 +4,4 @@
 *SA_baseline
 *omp_out
 *pthread_out
+parallel/Makefile
