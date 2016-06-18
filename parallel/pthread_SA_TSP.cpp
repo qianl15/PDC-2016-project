@@ -122,13 +122,14 @@ void saTSP(int* tour) {
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
+		unsigned int s = (unsigned int)time(0);
 		for (int i = 0; i < RELAX; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
-			int p = rand()%N, q = rand()%N;
+			int p = rand_r(&s)%N, q = rand_r(&s)%N;
 			// If will occur error if p=0 q=N-1...
 			if (abs(p - q) == N-1) {
-				q = rand()%(N-1);
-				p = rand()%(N-2);
+				q = rand_r(&s)%(N-1);
+				p = rand_r(&s)%(N-2);
 			}
 			if (p == q) {
 				q = (q + 2) % N;
@@ -145,7 +146,7 @@ void saTSP(int* tour) {
 
 			/* whether to accept the change */
 			if ((delta < 0) || ((delta > 0) && 
-				(exp(-delta/temperature) > (float)rand()/RAND_MAX))) {
+				(exp(-delta/temperature) > (float)rand_r(&s)/RAND_MAX))) {
 				currLen = currLen + delta;
 				int mid = (q - p) >> 1;
 				int tmp;
