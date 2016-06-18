@@ -33,10 +33,13 @@ make
 
 #### TODO list:
 - [x] Find dataset for TSP
-- [ ] Write baseline (single thread version) for Genetic algorithm (GA)
 - [x] Write baseline (single thread versiion) for Simulated Annealing algorithm (SA)
 - [x] Build MPI environment on the server
-- [ ] Write MPI version of two algorithms
+- [x] Write MPI version of SA
+- [x] Write pthread & OpenMP version of SA
 - [ ] Write CUDA / OpenCL version of two algorithms
-- [ ] **Optimization for MPI and GPU = =
 - [ ] Test the performance of the baseline and the parallel versions.
+- [ ] *Write baseline (single thread version) for Genetic algorithm (GA)
+- [ ] *Write MPI version of GA
+- [ ] *Write pthread & OpenMP version of GA
+- [ ] **Optimization for MPI and GPU = =
