@@ -133,7 +133,6 @@ void saTSP(int* tour) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
 		unsigned int s = time(0);
-		srandom(s);
 		s = s + random();
 		for (int i = 0; i < RELAX; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
@@ -196,6 +195,7 @@ int main(int argc, char **argv) {
 	}
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
+	srandom(time(0));
 	minTour = (int *)malloc(sizeof(int) * N);
 	int *currTour = (int *)malloc(sizeof(int) * N);
 	unsigned int s = time(0);
