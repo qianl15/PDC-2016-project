@@ -133,7 +133,8 @@ void saTSP(int* tour) {
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
-		unsigned int s = time(0) + random();
+		unsigned int s = time(0);
+		s = s + random();
 		for (int i = 0; i < RELAX; ++i) {
 			/* generate a random r to determine the proposal */
 			//float r = ((float) rand_r(&s)) / (float)RAND_MAX;
@@ -222,6 +223,7 @@ int main(int argc, char **argv) {
 		currTour[i] = (int *)malloc(sizeof(int) * N);
 	}
 	float currLen[MAXITER]={};
+	srandom(time(0));
 	#pragma omp parallel for private(j)
 	for (i = 0; i < MAXITER; ++i) {
 		//int *currTour = (int *)malloc(sizeof(int ) * N);

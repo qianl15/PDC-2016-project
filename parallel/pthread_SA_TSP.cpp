@@ -138,7 +138,8 @@ void saTSP(int* tour) {
 	int contCnt = 0; // the continuous same length times
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
-		unsigned int s = (unsigned int)time(0) + random();
+		unsigned int s = time(0);
+		s = s + random();
 		/* stay in the same temperature for RELAX times */
 		for (int i = 0; i < RELAX; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
@@ -237,10 +238,9 @@ int main(int argc, char **argv) {
 	}
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
-	srand(time(0));
 	minTour = (int *)malloc(sizeof(int) * N);
 	pthread_mutex_init(&mutex, NULL);
-
+	srandom(time(0));
 	/* create "nprocess" threads and work! */
 	pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * nprocess);
 	for (int i = 0; i < nprocess; ++i) {
