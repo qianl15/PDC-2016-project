@@ -31,6 +31,23 @@ int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
 
+class rand_x { 
+    unsigned int seed;
+public:
+    rand_x(int init) : seed(init) {}
+
+    int operator()(int limit) {
+        int divisor = RAND_MAX/(limit+1);
+        int retval;
+
+        do { 
+            retval = rand_r(&seed) / divisor;
+        } while (retval > limit);
+
+        return retval;
+    }        
+};
+
 /* load the data */
 void loadFile(char* filename) {
 	FILE *pf;
@@ -116,16 +133,17 @@ void saTSP(int* tour) {
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
+		unsigned int s = time(0) + random();
 		for (int i = 0; i < RELAX; ++i) {
 			/* generate a random r to determine the proposal */
-			//float r = ((float) rand()) / (float)RAND_MAX;
+			//float r = ((float) rand_r(&s)) / (float)RAND_MAX;
 
 			/* Proposal 1: Block Reverse between p and q */
-			int p = rand()%N, q = rand()%N;
+			int p = rand_r(&s)%N, q = rand_r(&s)%N;
 			// If will occur error if p=0 q=N-1...
 			if (abs(p - q) == N-1) {
-				q = rand()%(N-1);
-				p = rand()%(N-2);
+				q = rand_r(&s)%(N-1);
+				p = rand_r(&s)%(N-2);
 			}
 			if (p == q) {
 				q = (q + 2) % N;
@@ -142,7 +160,7 @@ void saTSP(int* tour) {
 
 			/* whether to accept the change */
 			if ((delta < 0) || ((delta > 0) && 
-				(exp(-delta/temperature) > (float)rand()/RAND_MAX))) {
+				(exp(-delta/temperature) > (float)rand_r(&s)/RAND_MAX))) {
 				currLen = currLen + delta;
 				int mid = (q - p) >> 1;
 				int tmp;
@@ -209,7 +227,9 @@ int main(int argc, char **argv) {
 		//int *currTour = (int *)malloc(sizeof(int ) * N);
 		for (j = 0; j < N; ++j)
 			currTour[i][j] = j;
-		random_shuffle(currTour[i], currTour[i] + N);
+		unsigned int s = time(0);
+		rand_x rg(s);
+		random_shuffle(currTour[i], currTour[i] + N, rg);
 		//#pragma omp task
 		saTSP(currTour[i]);
 		//float currLen = tourLen(currTour);

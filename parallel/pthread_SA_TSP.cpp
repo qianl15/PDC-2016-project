@@ -37,6 +37,23 @@ int nprocess = 1;
 int globalIter = -1;	// global iteration count
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+class rand_x { 
+    unsigned int seed;
+public:
+    rand_x(int init) : seed(init) {}
+
+    int operator()(int limit) {
+        int divisor = RAND_MAX/(limit+1);
+        int retval;
+
+        do { 
+            retval = rand_r(&seed) / divisor;
+        } while (retval > limit);
+
+        return retval;
+    }        
+};
+
 /* load the data */
 void loadFile(char* filename) {
 	FILE *pf;
@@ -121,8 +138,8 @@ void saTSP(int* tour) {
 	int contCnt = 0; // the continuous same length times
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
+		unsigned int s = (unsigned int)time(0) + random();
 		/* stay in the same temperature for RELAX times */
-		unsigned int s = (unsigned int)time(0);
 		for (int i = 0; i < RELAX; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
 			int p = rand_r(&s)%N, q = rand_r(&s)%N;
@@ -189,7 +206,9 @@ void *routine(void *idx) {
 		if (localIter >= MAXITER) {
 			break;
 		}
-		random_shuffle((int *)tour, (int *)tour + N);
+		unsigned int s = time(0);
+		rand_x rg(s);
+		random_shuffle((int *)tour, (int *)tour + N, rg);
 		saTSP((int *)tour);
 		int len = tourLen(tour);
 		if ((len < localMinDist) || (localMinDist < 0)) {
