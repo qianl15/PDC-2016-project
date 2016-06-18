@@ -17,7 +17,7 @@
 #define MAXITER 20		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
-#define RELAX 4000		// The times of relaxation of the same temperature
+#define RELAX 40000		// The times of relaxation of the same temperature
 #define ALPHA 0.999		// Cooling rate
 #define INITEMP 99.0	// Initial temperature
 #define STOPTEMP 0.001	// Termination temperature
@@ -29,6 +29,23 @@ float minTourDist = -1;		// The distance of shortest path
 int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
+
+class rand_x { 
+    unsigned int seed;
+public:
+    rand_x(int init) : seed(init) {}
+
+    int operator()(int limit) {
+        int divisor = RAND_MAX/(limit+1);
+        int retval;
+
+        do { 
+            retval = rand_r(&seed) / divisor;
+        } while (retval > limit);
+
+        return retval;
+    }        
+};
 
 /* load the data */
 void loadFile(char* filename) {
@@ -115,13 +132,15 @@ void saTSP(int* tour) {
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
 		/* stay in the same temperature for RELAX times */
+		unsigned int s = time(0);
+		s = s + random();
 		for (int i = 0; i < RELAX; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
-			int p = rand()%N, q = rand()%N;
+			int p = rand_r(&s)%N, q = rand_r(&s)%N;
 			// If will occur error if p=0 q=N-1...
 			if (abs(p - q) == N-1) {
-				q = rand()%(N-1);
-				p = rand()%(N-2);
+				q = rand_r(&s)%(N-1);
+				p = rand_r(&s)%(N-2);
 			}
 			if (p == q) {
 				q = (q + 2) % N;
@@ -138,7 +157,7 @@ void saTSP(int* tour) {
 
 			/* whether to accept the change */
 			if ((delta < 0) || ((delta > 0) && 
-				(exp(-delta/temperature) > (float)rand()/RAND_MAX))) {
+				(exp(-delta/temperature) > (float)rand_r(&s)/RAND_MAX))) {
 				currLen = currLen + delta;
 				int mid = (q - p) >> 1;
 				int tmp;
@@ -176,13 +195,15 @@ int main(int argc, char **argv) {
 	}
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
+	srandom(time(0));
 	minTour = (int *)malloc(sizeof(int) * N);
 	int *currTour = (int *)malloc(sizeof(int) * N);
-	srand(time(0));
+	unsigned int s = time(0);
 	for (int i = 0; i < MAXITER; ++i) {
 		for (int j = 0; j < N; ++j)
 			currTour[j] = j;
-		random_shuffle(currTour, currTour + N);
+		rand_x rg(s);
+		random_shuffle(currTour, currTour + N, rg);
 		saTSP(currTour);
 		float currLen = tourLen(currTour);
 		//printf("currLen is: %f\n", currLen);
