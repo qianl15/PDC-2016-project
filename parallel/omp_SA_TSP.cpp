@@ -1,6 +1,6 @@
 /*
 	Simulated Annealing algorithm for Traveling Salesman Problem
-	@@ baseline version: no parallel optimization, single thread
+	@@ omp version: no parallel optimization, single thread
 	
 	Input: xxx.tsp file
 	Output: optimal value (total distance)

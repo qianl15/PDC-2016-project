@@ -1,6 +1,6 @@
 /*
 	Simulated Annealing algorithm for Traveling Salesman Problem
-	@@ pthread version: no parallel optimization, single thread
+	@@ CUDA version: no parallel optimization, single thread
 	
 	Input: xxx.tsp file
 	Output: optimal value (total distance)
