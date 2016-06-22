@@ -15,25 +15,28 @@
 #include <algorithm>
 #include <sys/time.h>
 #include <pthread.h>
-#include <omp.h>
+#include <curand_kernel.h>
 #define MAXITER 20		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
-#define RELAX 40000		// The times of relaxation of the same temperature
+#define RELAX 100		// The times of relaxation of the same temperature
 #define ALPHA 0.999		// Cooling rate
 #define INITEMP 99.0	// Initial temperature
 #define STOPTEMP 0.001	// Termination temperature
 #define MAXLAST 3		// Stop if the tour length keeps unchanged for MAXLAST consecutive temperature
-#define MAXN 1000		// only support N <= 1000
+#define MAXN 64		// only support N <= 250
 using namespace std;
 
 float minTourDist = -1;		// The distance of shortest path
 int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
-float currLen[MAXITER]={};
-int *currTour[MAXITER]={};
-int nprocess = 1;
+__constant__ float dev_dist[MAXN][MAXN];
+
+float currLen = 0;
+int *currTour = NULL;
+int blockNum = 1;		// block number
+int threadNum = 1;	// thread number
 int globalIter = -1;	// global iteration count
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -131,40 +134,45 @@ float tourLen(int *tour) {
 }
 
 /* the main simulated annealing function */
-void saTSP(int* tour) {
-	float currLen = tourLen(tour);
+__global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates) {
+	int thid = (blockIdx.x * blockDim.x) + threadIdx.x;
+	int *tour = &globalTour[thid * cityCnt];
+	float currLen = 0;
+	for (int i = 0; i < cityCnt - 1; ++i) {
+		currLen += dev_dist[tour[i]][tour[i+1]];
+	}
+	currLen += dev_dist[tour[cityCnt-1]][tour[0]];
 	float temperature = INITEMP;
 	float lastLen = currLen;
 	int contCnt = 0; // the continuous same length times
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
-		unsigned int s = time(0);
-		s = s + random();
 		/* stay in the same temperature for RELAX times */
 		for (int i = 0; i < RELAX; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
-			int p = rand_r(&s)%N, q = rand_r(&s)%N;
+			int p = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 1));
+			int q = p + (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - p));
 			// If will occur error if p=0 q=N-1...
-			if (abs(p - q) == N-1) {
-				q = rand_r(&s)%(N-1);
-				p = rand_r(&s)%(N-2);
+			if (abs(p - q) == cityCnt - 1) {
+				p = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 2));
+				q = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 1));
 			}
 			if (p == q) {
-				q = (q + 2) % N;
+				q = (q + 2) % cityCnt;
 			}
 			if (p > q) {
 				int tmp = p;
 				p = q;
 				q = tmp;
 			}
-			int p1 = (p - 1 + N) % N;
-			int q1 = (q + 1) % N;
+			int p1 = (p - 1 + cityCnt) % cityCnt;
+			int q1 = (q + 1) % cityCnt;
 			int tp = tour[p], tq = tour[q], tp1 = tour[p1], tq1 = tour[q1];
-			float delta = dist[tp][tq1] + dist[tp1][tq] - dist[tp][tp1] - dist[tq][tq1];
+			float delta = dev_dist[tp][tq1] + dev_dist[tp1][tq] - dev_dist[tp][tp1] - dev_dist[tq][tq1];
 
 			/* whether to accept the change */
 			if ((delta < 0) || ((delta > 0) && 
-				(exp(-delta/temperature) > (float)rand_r(&s)/RAND_MAX))) {
+				(expf(-delta/temperature) > curand_uniform(&(randStates[thid]))))) {
 				currLen = currLen + delta;
 				int mid = (q - p) >> 1;
 				int tmp;
@@ -178,7 +186,7 @@ void saTSP(int* tour) {
 
 		}
 
-		if (fabs(currLen - lastLen) < 1e-2) {
+		if ((currLen - lastLen < 1e-2) && (currLen - lastLen > -1e-2)) {
 			contCnt += 1;
 			if (contCnt >= MAXLAST) {
 				//printf("unchanged for %d times1!\n", contCnt);
@@ -193,86 +201,77 @@ void saTSP(int* tour) {
 	return;
 }
 
-void *routine(void *idx) {
-	long tid = (long)idx;
-	int *localMin = (int *)malloc(sizeof(int) * N);
-	int *tour = currTour[tid];
-	float localMinDist = -1;
-	int localIter = -1;
-	for (int i = 0; i < MAXITER; ++i) {
-		pthread_mutex_lock(&mutex);
-		globalIter++;
-		localIter = globalIter;
-		pthread_mutex_unlock(&mutex);
-		if (localIter >= MAXITER) {
-			break;
-		}
-		unsigned int s = time(0);
-		rand_x rg(s);
-		random_shuffle((int *)tour, (int *)tour + N, rg);
-		saTSP((int *)tour);
-		int len = tourLen(tour);
-		if ((len < localMinDist) || (localMinDist < 0)) {
-			localMinDist = len;
-			memcpy(localMin, tour, sizeof(int) * N);
-		}
-	}
-	memcpy(tour, localMin, sizeof(int) * N);
-	free(localMin);
-	return NULL;
+__global__ void setup_kernel_randomness(curandState * state, unsigned long seed)
+{
+	int s_id = (blockIdx.x*blockDim.x) + threadIdx.x;
+	curand_init(seed*s_id, s_id, 0, &state[s_id]);
 }
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
-		printf("Please enter the filename!\n");
+		printf("Usage: ./cuda_tsp <filename> <blockNum> <threadNum>\n");
 		return 0;
 	}
 	else {
 		loadFile(argv[1]);
+		cudaMemcpyToSymbol(dev_dist, dist, sizeof(float)*MAXN*MAXN);
 	}
-	if (argc > 2) {
-		nprocess = atoi(argv[2]);
-		if (nprocess > N) {
-			nprocess = N;
-		}
+	if (argc == 4) {
+		blockNum = atoi(argv[2]);
+		threadNum = atoi(argv[3]);
 	}
+	printf("blockNum is: %d, threadNum is: %d\n", blockNum, threadNum);
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
-	minTour = (int *)malloc(sizeof(int) * N);
-	pthread_mutex_init(&mutex, NULL);
 	srandom(time(0));
-	/* create "nprocess" threads and work! */
-	pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * nprocess);
-	for (int i = 0; i < nprocess; ++i) {
-		currTour[i] = (int *)malloc(sizeof(int) * N);
-		for (int j = 0; j < N; ++j)
-			currTour[i][j] = j;
-		if (pthread_create(&threads[i], NULL, routine, (void *)i)) {
-			fprintf(stderr, "Fail to create thread!\n");
-			exit(1);
-		}
+	int *dev_currTour; // currTour on device;
+	int itersCnt = blockNum * threadNum; // total iterations
+	cudaError_t err = cudaSuccess;
+	err = cudaMalloc((void **)&dev_currTour, sizeof(int)*N*itersCnt);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc() failed\n");
+		exit(1);
 	}
 
-	/* join all the threads */
-	void *status;
-	for (int i = 0; i < nprocess; ++i) {
-		if (pthread_join(threads[i], &status)) {
-			fprintf(stderr, "Fail to create thread!\n");
-			exit(1);
-		}
-		currLen[i] = tourLen(currTour[i]);
+	srand(time(0));
+	currTour = (int *)malloc(sizeof(int) * N * itersCnt);
+	for (int i = 0; i < itersCnt; ++i) {
+		for (int j = 0; j < N; ++j)
+			currTour[i*N + j] = j;
+		random_shuffle(currTour+i*N, currTour+(i+1)*N);
 	}
-	
+	err = cudaMemcpy(dev_currTour, currTour, itersCnt * N * sizeof(int), cudaMemcpyHostToDevice);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "cudaMalloc() for dev_currTour failed\n");
+		exit(1);
+	}
+
+	// allocate random seed for each thread
+	curandState *devStates;
+	cudaMalloc((void **)&devStates, itersCnt * sizeof(curandState));	
+	setup_kernel_randomness<<<blockNum, threadNum>>>(devStates, time(0));
+	cudaDeviceSynchronize();
+	saTSP<<<blockNum, threadNum>>>(N, dev_currTour, devStates);
+	cudaDeviceSynchronize();
+	minTour = (int *)malloc(sizeof(int) * N);
+	memset(currTour, 0, itersCnt * N * sizeof(int));
+	err = cudaMemcpy(currTour, dev_currTour, itersCnt * N * sizeof(int), cudaMemcpyDeviceToHost);
+	if (err != cudaSuccess) {
+		fprintf(stderr, "cudaMemcpyc(Device to Host) failed with %d\n", err);
+		exit(1);
+	}
+
 	/* find the minimal answer */
 	int minidx = 0;
-	for (int i = 0; i < nprocess; ++i) {
-		if ((currLen[i] < minTourDist) || (minTourDist < 0)) {
-			minTourDist = currLen[i];
+	for (int i = 0; i < itersCnt; ++i) {
+		currLen = tourLen(currTour + i * N);
+		if ((currLen < minTourDist) || (minTourDist < 0)) {
+			minTourDist = currLen;
 			minidx = i;
 		}
 	}
 	for (int i = 0; i < N; ++i) {
-		minTour[i] = currTour[minidx][i];
+		minTour[i] = currTour[minidx * N + i];
 	}
 	gettimeofday(&stop, NULL);
 
@@ -281,13 +280,12 @@ int main(int argc, char **argv) {
 	int timemin = tottime / 60;
 	int timesec = tottime % 60;
 	printf("Total time usage: %d min %d sec. \n", timemin, timesec);
-	printf("The shortest length is: %f\n And the tour is: \n", minTourDist);
+	printf("N is %d, The shortest length is: %f\n And the tour is: \n", N, minTourDist);
 	for (int i = 0; i < N; ++i) {
 		printf("%d \n", minTour[i]+1);
 	}
 	free(minTour);
-	for (int i = 0; i < nprocess; ++i)
-		free(currTour[i]);
-	pthread_mutex_destroy(&mutex);
+	free(currTour);
+	
 	return 0;
 }
