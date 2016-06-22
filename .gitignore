@@ -5,4 +5,4 @@
 *omp_out
 *pthread_out
 parallel/Makefile
-parallel/run.sh
+*run.sh
