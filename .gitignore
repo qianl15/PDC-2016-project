@@ -6,3 +6,4 @@
 *pthread_out
 parallel/Makefile
 *run.sh
+*cuda_tsp
