@@ -19,19 +19,18 @@
 #define MAXITER 20		// Proposal 20 routes and then select the best one
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
-#define RELAX 100		// The times of relaxation of the same temperature
+#define RELAX 400		// The times of relaxation of the same temperature
 #define ALPHA 0.999		// Cooling rate
 #define INITEMP 99.0	// Initial temperature
 #define STOPTEMP 0.001	// Termination temperature
 #define MAXLAST 3		// Stop if the tour length keeps unchanged for MAXLAST consecutive temperature
-#define MAXN 64		// only support N <= 250
+#define MAXN 250		// only support N <= 250
 using namespace std;
 
 float minTourDist = -1;		// The distance of shortest path
 int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
-float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
-__constant__ float dev_dist[MAXN][MAXN];
+float *dist = NULL;	// The distance matrix, use (i-1) instead of i
 
 float currLen = 0;
 int *currTour = NULL;
@@ -77,7 +76,8 @@ void loadFile(char* filename) {
 	printf("The N is: %d\n", N);
 	fscanf(pf, "\nEDGE_WEIGHT_TYPE: %[^\n]s", buff);
 	printf("the type is: %s\n", buff);
-	memset(dist, 0, sizeof(dist));
+	dist = (float *)malloc(sizeof(float) * N * N);
+	memset(dist, 0, sizeof(float) * N * N);
 	if (strcmp(buff, "EUC_2D") == 0) {
 		fscanf(pf, "\nNODE_COORD_SECTION");
 		float nodeCoord[MAXN][2] = {};
@@ -95,8 +95,8 @@ void loadFile(char* filename) {
 				yi = nodeCoord[i][1];
 				xj = nodeCoord[j][0];
 				yj = nodeCoord[j][1];
-				dist[i][j] = (float)sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj));
-				dist[j][i] = dist[i][j];
+				dist[i*N + j] = (float)sqrt((xi - xj) * (xi - xj) + (yi - yj) * (yi - yj));
+				dist[j*N + i] = dist[i*N + j];
 			}
 		}
 	}
@@ -111,8 +111,8 @@ void loadFile(char* filename) {
 		for (int i = 0; i < N; ++i) {
 			for (int j = 0; j <= i; ++j) {
 				fscanf(pf, "%f", &weight);
-				dist[i][j] = weight;
-				dist[j][i] = weight;
+				dist[i*N + j] = weight;
+				dist[j*N + i] = weight;
 			}
 		}
 	}
@@ -127,21 +127,21 @@ float tourLen(int *tour) {
 	}
 	float cnt = 0;
 	for (int i = 0; i < N - 1; ++i) {
-		cnt += dist[tour[i]][tour[i+1]];
+		cnt += dist[tour[i]*N + tour[i+1]];
 	}
-	cnt += dist[tour[N-1]][tour[0]];
+	cnt += dist[tour[N-1]*N + tour[0]];
 	return cnt;
 }
 
 /* the main simulated annealing function */
-__global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates) {
+__global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates,  float *dev_dist) {
 	int thid = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int *tour = &globalTour[thid * cityCnt];
 	float currLen = 0;
 	for (int i = 0; i < cityCnt - 1; ++i) {
-		currLen += dev_dist[tour[i]][tour[i+1]];
+		currLen += dev_dist[tour[i]*cityCnt + tour[i+1]];
 	}
-	currLen += dev_dist[tour[cityCnt-1]][tour[0]];
+	currLen += dev_dist[tour[cityCnt-1]*cityCnt + tour[0]];
 	float temperature = INITEMP;
 	float lastLen = currLen;
 	int contCnt = 0; // the continuous same length times
@@ -150,12 +150,12 @@ __global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates) {
 		/* stay in the same temperature for RELAX times */
 		for (int i = 0; i < RELAX; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
-			int p = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 1));
-			int q = p + (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - p));
+			int p = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt + 10)) % cityCnt;
+			int q = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt + 10)) % cityCnt;
 			// If will occur error if p=0 q=N-1...
 			if (abs(p - q) == cityCnt - 1) {
-				p = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 2));
-				q = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 1));
+				p = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 3));
+				q = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt - 2));
 			}
 			if (p == q) {
 				q = (q + 2) % cityCnt;
@@ -168,7 +168,7 @@ __global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates) {
 			int p1 = (p - 1 + cityCnt) % cityCnt;
 			int q1 = (q + 1) % cityCnt;
 			int tp = tour[p], tq = tour[q], tp1 = tour[p1], tq1 = tour[q1];
-			float delta = dev_dist[tp][tq1] + dev_dist[tp1][tq] - dev_dist[tp][tp1] - dev_dist[tq][tq1];
+			float delta = dev_dist[tp*cityCnt + tq1] + dev_dist[tp1*cityCnt + tq] - dev_dist[tp*cityCnt + tp1] - dev_dist[tq*cityCnt + tq1];
 
 			/* whether to accept the change */
 			if ((delta < 0) || ((delta > 0) && 
@@ -208,13 +208,22 @@ __global__ void setup_kernel_randomness(curandState * state, unsigned long seed)
 }
 
 int main(int argc, char **argv) {
+	cudaError_t err = cudaSuccess;
+	float *dev_dist;
+	
 	if (argc < 2) {
 		printf("Usage: ./cuda_tsp <filename> <blockNum> <threadNum>\n");
 		return 0;
 	}
 	else {
 		loadFile(argv[1]);
-		cudaMemcpyToSymbol(dev_dist, dist, sizeof(float)*MAXN*MAXN);
+		err = cudaMalloc((void **)&dev_dist, sizeof(float) * N * N);
+		if (err != cudaSuccess) {
+			fprintf(stderr, "cudaMalloc() failed\n");
+			exit(1);
+		}
+
+		cudaMemcpy((void *)dev_dist, dist, sizeof(float) * N * N, cudaMemcpyHostToDevice);
 	}
 	if (argc == 4) {
 		blockNum = atoi(argv[2]);
@@ -226,7 +235,6 @@ int main(int argc, char **argv) {
 	srandom(time(0));
 	int *dev_currTour; // currTour on device;
 	int itersCnt = blockNum * threadNum; // total iterations
-	cudaError_t err = cudaSuccess;
 	err = cudaMalloc((void **)&dev_currTour, sizeof(int)*N*itersCnt);
 	if (err != cudaSuccess) {
 		fprintf(stderr, "cudaMalloc() failed\n");
@@ -236,9 +244,14 @@ int main(int argc, char **argv) {
 	srand(time(0));
 	currTour = (int *)malloc(sizeof(int) * N * itersCnt);
 	for (int i = 0; i < itersCnt; ++i) {
-		for (int j = 0; j < N; ++j)
+		for (int j = 0; j < N; ++j) {
 			currTour[i*N + j] = j;
+		}
 		random_shuffle(currTour+i*N, currTour+(i+1)*N);
+		/*for (int j = 0; j < N; ++j) {
+			printf("%d ", currTour[i*N + j]);
+		}
+		printf("%d before: %f\n", i, tourLen(currTour + i*N));*/
 	}
 	err = cudaMemcpy(dev_currTour, currTour, itersCnt * N * sizeof(int), cudaMemcpyHostToDevice);
 	if (err != cudaSuccess) {
@@ -251,7 +264,7 @@ int main(int argc, char **argv) {
 	cudaMalloc((void **)&devStates, itersCnt * sizeof(curandState));	
 	setup_kernel_randomness<<<blockNum, threadNum>>>(devStates, time(0));
 	cudaDeviceSynchronize();
-	saTSP<<<blockNum, threadNum>>>(N, dev_currTour, devStates);
+	saTSP<<<blockNum, threadNum>>>(N, dev_currTour, devStates, dev_dist);
 	cudaDeviceSynchronize();
 	minTour = (int *)malloc(sizeof(int) * N);
 	memset(currTour, 0, itersCnt * N * sizeof(int));
@@ -264,7 +277,12 @@ int main(int argc, char **argv) {
 	/* find the minimal answer */
 	int minidx = 0;
 	for (int i = 0; i < itersCnt; ++i) {
-		currLen = tourLen(currTour + i * N);
+		currLen = tourLen(&currTour[i * N]);
+		/*for (int j = 0; j < N; ++j) {
+			printf("%d ", currTour[i*N + j]);
+		}
+
+		printf("%d after: %f\n", i, currLen);*/
 		if ((currLen < minTourDist) || (minTourDist < 0)) {
 			minTourDist = currLen;
 			minidx = i;
@@ -284,6 +302,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < N; ++i) {
 		printf("%d \n", minTour[i]+1);
 	}
+	free(dist);
 	free(minTour);
 	free(currTour);
 	
