@@ -14,7 +14,7 @@
 using namespace std;
 
 const int MAX_SEED = 500;
-const int RELAX = 4000;
+const int RELAX = 40000;
 const int MAX_LAST = 3;
 const float EPS = 1E-5;
 
@@ -137,7 +137,7 @@ bool solve(TSP &seed, float temperature) {
 int main(int argc, char *argv[]) {
 	init();
 	if (argc < 2) {
-		fprintf(stderr, "Usage: ./%s input_filename.\n", argv[0]);
+		fprintf(stderr, "Usage: %s input_filename.\n", argv[0]);
 		exit(1);
 	}
 	loadFile(argv[1]);
@@ -150,7 +150,10 @@ int main(int argc, char *argv[]) {
 	vector<TSP> tmpSeeds, terminated;
 	vector<pair<int, int>> target;
 	float temperature = INIT_TEMP;
-	while (temperature > STOP_TEMP && !seeds.empty()) {
+	while (!communicator.isFinished()) {
+		if (temperature <= STOP_TEMP || seeds.empty()) {
+			communicator.voteToHalt();
+		}
 		temperature *= RATIO;
 		for (int i = 0; i < (int)seeds.size(); ++i) {
 			if (solve(seeds[i], temperature)) {
@@ -171,8 +174,11 @@ int main(int argc, char *argv[]) {
 				seeds.pop_back();
 			}
 		}
-		cerr << getWorkerID() << ' ' << seeds.size() << endl;
 		communicator.syncBuffer();
+		for (auto &item: communicator.getMessage()) {
+			seeds.push_back(item);
+		}
+		cerr << getWorkerID() << ' ' << seeds.size() << endl;
 	}
 
 	barrier();

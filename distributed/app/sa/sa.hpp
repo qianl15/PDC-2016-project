@@ -54,10 +54,12 @@ obinstream &operator<<(obinstream &bout, const TSP &tsp) {
 	bout << tsp.tour;
 	bout << tsp.curLen << tsp.preLen;
 	bout << tsp.contCnt << tsp.halt;
+	return bout;
 }
 
 ibinstream &operator>>(ibinstream &bin, TSP &tsp) {
 	bin >> tsp.tour;
 	bin >> tsp.curLen >> tsp.preLen;
 	bin >> tsp.contCnt >> tsp.halt;
+	return bin;
 }

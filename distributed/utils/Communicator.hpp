@@ -15,6 +15,17 @@ class Communicator {
 			numPeers = getNumWorkers();
 			me = getWorkerID();
 			outBuffer.resize(numPeers);
+			active = 1;
+		}
+
+		void voteToHalt() {
+			active = 0;
+		}
+
+		bool isFinished() {
+			int ret;
+			MPI_Allreduce(&active, &ret, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+			return ret == 0;
 		}
 
 		void putMessage(const int dst, const BufferT &msg) {
@@ -30,6 +41,7 @@ class Communicator {
 		}
 
 		void syncBuffer() {
+			clearInBuffer();
 			allToAll(outBuffer);
 			for (int i = 0; i < numPeers; ++i) {
 				std::vector<BufferT> msgBuf = outBuffer[i];
@@ -174,6 +186,7 @@ class Communicator {
 	private:
 		int numPeers;
 		int me;
+		int active;
 		std::vector<BufferT> inBuffer;
 		std::vector<std::vector<BufferT>> outBuffer;
 };
