@@ -13,7 +13,7 @@
 
 using namespace std;
 
-const int MAX_SEED = 500;
+const int MAX_SEED = 5;
 const int RELAX = 4000;
 const int MAX_LAST = 3;
 const float EPS = 1E-5;
@@ -178,18 +178,22 @@ int main(int argc, char *argv[]) {
 		for (auto &item: communicator.getMessage()) {
 			seeds.push_back(item);
 		}
-		cerr << getWorkerID() << ' ' << seeds.size() << endl;
 	}
 
 	barrier();
 
-	int k = 0;
-	for (int i = 1; i < (int)terminated.size(); ++i) {
-		if (terminated[i].curLen < terminated[k].curLen) {
-			k = i;
+	terminated.insert(terminated.end(), seeds.begin(), seeds.end());
+	if (terminated.size() == 0) {
+		communicator.gatherWorker(TSP());
+	} else {
+		int k = 0;
+		for (int i = 1; i < (int)terminated.size(); ++i) {
+			if (terminated[i].curLen < terminated[k].curLen) {
+				k = i;
+			}
 		}
+		communicator.gatherWorker(terminated[k]);
 	}
-	communicator.gatherWorker(terminated[k]);
 
 	finalize();
 	return 0;
