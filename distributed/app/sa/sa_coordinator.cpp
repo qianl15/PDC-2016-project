@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <sys/time.h>
 
 #include "sa.hpp"
 #include "../../utils/global.hpp"
@@ -19,6 +20,9 @@ int main() {
 
 	barrier();
 	fprintf(stderr, "Finished loading.\n");
+
+	struct timeval start, stop;
+	gettimeofday(&start, NULL);
 
 	vector<int> seedCount(n);
 	vector<pair<int, int>> origin(n);
@@ -74,6 +78,12 @@ int main() {
 
 	barrier();
 	fprintf(stderr, "Finished computing.\n");
+
+	gettimeofday(&stop, NULL);
+	int totTime = stop.tv_sec - start.tv_sec;
+	int timeMin = totTime / 60;
+	int timeSec = totTime % 60;
+	fprintf(stderr, "Total time used: %dmin %dsec.\n", timeMin, timeSec);
 
 	vector<TSP> results(n);
 	communicator.gatherMaster(results);

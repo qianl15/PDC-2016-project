@@ -14,7 +14,7 @@
 using namespace std;
 
 const int MAX_SEED = 500;
-const int RELAX = 40000;
+const int RELAX = 4000;
 const int MAX_LAST = 3;
 const float EPS = 1E-5;
 
