@@ -14,8 +14,6 @@ Given a list of cities and the distances between each pair of cities, what is th
     GR17 is a set of 17 cities, from TSPLIB. The minimal tour has length 2085.  
 2. [TSPLIB library](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/)  
     ch150 is a set of 150 cities, from TSPLIB. The minimal tour has length 6528.
-3. [China - 71,009 Cities](http://www.math.uwaterloo.ca/tsp/world/chlog.html)  
-    It contains China - 71,009 Cities.  
 
 #### Folders
 1. dataset/: ALL of the datasets
@@ -37,9 +35,9 @@ make
 - [x] Build MPI environment on the server
 - [x] Write MPI version of SA
 - [x] Write pthread & OpenMP version of SA
-- [ ] Write CUDA / OpenCL version of two algorithms
+- [x] Write CUDA / OpenCL version of two algorithms
 - [ ] Test the performance of the baseline and the parallel versions.
-- [ ] *Write baseline (single thread version) for Genetic algorithm (GA)
+- [x] *Write baseline (single thread version) for Genetic algorithm (GA)
 - [ ] *Write MPI version of GA
 - [ ] *Write pthread & OpenMP version of GA
 - [ ] **Optimization for MPI and GPU = =
