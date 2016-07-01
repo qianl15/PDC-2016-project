@@ -36,8 +36,7 @@ make
 - [x] Write MPI version of SA
 - [x] Write pthread & OpenMP version of SA
 - [x] Write CUDA / OpenCL version of two algorithms
-- [ ] Test the performance of the baseline and the parallel versions.
+- [x] Test the performance of the baseline and the parallel versions.
 - [x] *Write baseline (single thread version) for Genetic algorithm (GA)
-- [ ] *Write MPI version of GA
-- [ ] *Write pthread & OpenMP version of GA
-- [ ] **Optimization for MPI and GPU = =
+- [x] *Write OpenMP version of GA
+- [x] **Optimization for MPI and GPU = =
