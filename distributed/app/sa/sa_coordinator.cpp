@@ -19,7 +19,6 @@ int main() {
 	communicator.voteToHalt();
 
 	barrier();
-	fprintf(stderr, "Finished loading.\n");
 
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
@@ -31,10 +30,13 @@ int main() {
 	float temperature = INIT_TEMP;
 	while (!communicator.isFinished()) {
 		temperature *= RATIO;
-
-		cerr << temperature << endl;
+		if (temperature > 10) {
+			continue;
+		}
 
 		communicator.gatherMaster(seedCount);
+
+//		cerr << temperature << endl;
 
 		int sum = 0;
 		for (int i = 1; i < n; ++i) {
@@ -73,13 +75,10 @@ int main() {
 	}
 
 	barrier();
-	fprintf(stderr, "Finished computing.\n");
 
 	gettimeofday(&stop, NULL);
-	int totTime = stop.tv_sec - start.tv_sec;
-	int timeMin = totTime / 60;
-	int timeSec = totTime % 60;
-	fprintf(stderr, "Total time used: %dmin %dsec.\n", timeMin, timeSec);
+	double totTime = (stop.tv_sec - start.tv_sec) * 1000.0 + (stop.tv_usec - start.tv_usec) / 1000.0;
+	printf("Total time used: %.3fms.\n", totTime);
 
 	vector<TSP> results(n);
 	communicator.gatherMaster(results);

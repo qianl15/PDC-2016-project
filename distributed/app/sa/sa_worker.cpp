@@ -13,11 +13,11 @@
 
 using namespace std;
 
-const int MAX_SEED = 5;
-const int RELAX = 4000;
+const int RELAX = 40000;
 const int MAX_LAST = 3;
 const float EPS = 1E-5;
 
+int MAX_SEED;
 float TSP::dist[N][N];
 int TSP::n;
 
@@ -136,11 +136,12 @@ bool solve(TSP &seed, float temperature) {
 
 int main(int argc, char *argv[]) {
 	init();
-	if (argc < 2) {
+	if (argc < 3) {
 		fprintf(stderr, "Usage: %s input_filename.\n", argv[0]);
 		exit(1);
 	}
 	loadFile(argv[1]);
+	MAX_SEED = atoi(argv[2]);
 	barrier();
 
 	srand(time(NULL) + getWorkerID());
@@ -164,6 +165,9 @@ int main(int argc, char *argv[]) {
 		}
 		seeds = tmpSeeds;
 		tmpSeeds.clear();
+		if (temperature > 10) {
+			continue;
+		}
 		communicator.gatherWorker((int)seeds.size());
 		communicator.scatterWorker(target);
 		for (auto &p: target) {
@@ -178,6 +182,7 @@ int main(int argc, char *argv[]) {
 		for (auto &item: communicator.getMessage()) {
 			seeds.push_back(item);
 		}
+//		cerr << getWorkerID() << ' ' << seeds.size() << endl;
 	}
 
 	barrier();

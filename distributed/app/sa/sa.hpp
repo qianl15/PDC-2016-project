@@ -8,7 +8,7 @@ using namespace std;
 #define N 1000
 #define INIT_TEMP 99
 #define STOP_TEMP 0.01
-#define RATIO 0.99
+#define RATIO 0.999
 
 class TSP {
 	public:
@@ -34,11 +34,14 @@ class TSP {
 		}
 
 		void output() {
+			printf("The shortest length is: %f.\n", curLen);
+/*
 			printf("The shortest length is: %f\nAnd the tour is:", curLen);
 			for (int i = 0; i < (int)tour.size(); ++i) {
 				printf(" %d", tour[i] + 1);
 			}
 			printf("\n");
+*/
 		}
 
 		vector<int> tour;
