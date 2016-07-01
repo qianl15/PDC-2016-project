@@ -1,11 +1,11 @@
 /*
-	Simulated Annealing algorithm for Traveling Salesman Problem
-	@@ baseline version: no parallel optimization, single thread
-	
-	Input: xxx.tsp file
-	Output: optimal value (total distance)
-			& solution route: permutation of {1, 2, ..., N}
-*/
+   Simulated Annealing algorithm for Traveling Salesman Problem
+   @@ baseline version: no parallel optimization, single thread
+
+Input: xxx.tsp file
+Output: optimal value (total distance)
+& solution route: permutation of {1, 2, ..., N}
+ */
 
 #include <iostream>
 #include <stdio.h>
@@ -31,20 +31,20 @@ int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
 
 class rand_x { 
-    unsigned int seed;
-public:
-    rand_x(int init) : seed(init) {}
+	unsigned int seed;
+	public:
+	rand_x(int init) : seed(init) {}
 
-    int operator()(int limit) {
-        int divisor = RAND_MAX/(limit+1);
-        int retval;
+	int operator()(int limit) {
+		int divisor = RAND_MAX/(limit+1);
+		int retval;
 
-        do { 
-            retval = rand_r(&seed) / divisor;
-        } while (retval > limit);
+		do { 
+			retval = rand_r(&seed) / divisor;
+		} while (retval > limit);
 
-        return retval;
-    }        
+		return retval;
+	}        
 };
 
 /* load the data */
@@ -157,7 +157,7 @@ void saTSP(int* tour) {
 
 			/* whether to accept the change */
 			if ((delta < 0) || ((delta > 0) && 
-				(exp(-delta/temperature) > (float)rand_r(&s)/RAND_MAX))) {
+						(exp(-delta/temperature) > (float)rand_r(&s)/RAND_MAX))) {
 				currLen = currLen + delta;
 				int mid = (q - p) >> 1;
 				int tmp;
