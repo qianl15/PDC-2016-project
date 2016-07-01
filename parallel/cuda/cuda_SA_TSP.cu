@@ -25,6 +25,7 @@
 #define STOPTEMP 0.001	// Termination temperature
 #define MAXLAST 3		// Stop if the tour length keeps unchanged for MAXLAST consecutive temperature
 #define MAXN 250		// only support N <= 250
+#define THREADITER 200
 using namespace std;
 
 float minTourDist = -1;		// The distance of shortest path
@@ -32,7 +33,6 @@ int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float *dist = NULL;	// The distance matrix, use (i-1) instead of i
 
-float currLen = 0;
 int *currTour = NULL;
 int blockNum = 1;		// block number
 int threadNum = 1;	// thread number
@@ -134,7 +134,7 @@ float tourLen(int *tour) {
 }
 
 /* the main simulated annealing function */
-__global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates,  float *dev_dist) {
+__global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates,  float *dev_dist, float temperature, int relaxiter) {
 	int thid = (blockIdx.x * blockDim.x) + threadIdx.x;
 	int *tour = &globalTour[thid * cityCnt];
 	float currLen = 0;
@@ -142,13 +142,15 @@ __global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates,  fl
 		currLen += dev_dist[tour[i]*cityCnt + tour[i+1]];
 	}
 	currLen += dev_dist[tour[cityCnt-1]*cityCnt + tour[0]];
-	float temperature = INITEMP;
-	float lastLen = currLen;
-	int contCnt = 0; // the continuous same length times
+	//float temperature = INITEMP;
+	//float lastLen = currLen;
+	//int contCnt = 0; // the continuous same length times
+	int iterCnt = 0;
 	while (temperature > STOPTEMP) {
 		temperature *= ALPHA;
+		iterCnt += 1;
 		/* stay in the same temperature for RELAX times */
-		for (int i = 0; i < RELAX; ++i) {
+		for (int i = 0; i < relaxiter; ++i) {
 			/* Proposal 1: Block Reverse between p and q */
 			int p = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt + 10)) % cityCnt;
 			int q = (int)(curand_uniform(&(randStates[thid])) * (float)(cityCnt + 10)) % cityCnt;
@@ -185,7 +187,7 @@ __global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates,  fl
 			}
 
 		}
-
+	/*
 		if ((currLen - lastLen < 1e-2) && (currLen - lastLen > -1e-2)) {
 			contCnt += 1;
 			if (contCnt >= MAXLAST) {
@@ -196,6 +198,7 @@ __global__ void saTSP(int cityCnt, int* globalTour, curandState *randStates,  fl
 		else
 			contCnt = 0;
 		lastLen = currLen;
+	*/
 	}
 	
 	return;
@@ -264,8 +267,19 @@ int main(int argc, char **argv) {
 	cudaMalloc((void **)&devStates, itersCnt * sizeof(curandState));	
 	setup_kernel_randomness<<<blockNum, threadNum>>>(devStates, time(0));
 	cudaDeviceSynchronize();
-	saTSP<<<blockNum, threadNum>>>(N, dev_currTour, devStates, dev_dist);
-	cudaDeviceSynchronize();
+
+	float currLen = 0;
+	
+	float temperature = INITEMP;
+	int contCnt = 0;
+	float tempstep = pow(ALPHA, THREADITER);
+	//while (temperature > STOPTEMP) {
+		//printf("%.06f \n", temperature);
+		saTSP<<<blockNum, threadNum>>>(N, dev_currTour, devStates, dev_dist, temperature, RELAX);
+		cudaDeviceSynchronize();	
+	//	temperature *= tempstep;
+	//}
+
 	minTour = (int *)malloc(sizeof(int) * N);
 	memset(currTour, 0, itersCnt * N * sizeof(int));
 	err = cudaMemcpy(currTour, dev_currTour, itersCnt * N * sizeof(int), cudaMemcpyDeviceToHost);

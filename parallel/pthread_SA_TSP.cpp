@@ -16,7 +16,9 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <omp.h>
-#define MAXITER 20		// Proposal 20 routes and then select the best one
+#ifndef MAXITER 
+	#define MAXITER 20		// Proposal 20 routes and then select the best one
+#endif
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
 #define RELAX 40000		// The times of relaxation of the same temperature
@@ -31,11 +33,12 @@ float minTourDist = -1;		// The distance of shortest path
 int *minTour = NULL;		// The shortest path
 int N = 0;					// Number of cities
 float dist[MAXN][MAXN] = {};	// The distance matrix, use (i-1) instead of i
-float currLen[MAXITER]={};
-int *currTour[MAXITER]={};
+float currLen[1024]={};
+int *currTour[1024]={};
 int nprocess = 1;
 int globalIter = -1;	// global iteration count
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex2 = PTHREAD_MUTEX_INITIALIZER;
 
 class rand_x { 
     unsigned int seed;
@@ -197,6 +200,7 @@ void *routine(void *idx) {
 	long tid = (long)idx;
 	int *localMin = (int *)malloc(sizeof(int) * N);
 	int *tour = currTour[tid];
+    memcpy(localMin, tour, sizeof(int) * N);
 	float localMinDist = -1;
 	int localIter = -1;
 	for (int i = 0; i < MAXITER; ++i) {
@@ -208,8 +212,9 @@ void *routine(void *idx) {
 			break;
 		}
 		unsigned int s = time(0);
-		rand_x rg(s);
-		random_shuffle((int *)tour, (int *)tour + N, rg);
+		pthread_mutex_lock(&mutex2);
+		random_shuffle((int *)tour, (int *)tour + N);
+		pthread_mutex_unlock(&mutex2);
 		saTSP((int *)tour);
 		int len = tourLen(tour);
 		if ((len < localMinDist) || (localMinDist < 0)) {
@@ -232,23 +237,25 @@ int main(int argc, char **argv) {
 	}
 	if (argc > 2) {
 		nprocess = atoi(argv[2]);
-		if (nprocess > N) {
-			nprocess = N;
+		if (nprocess > MAXITER) {
+			nprocess = MAXITER;
 		}
 	}
+	printf("MaxIter=%d, Processor=%d, %s \n", MAXITER, nprocess, argv[1]);
 	struct timeval start, stop;
 	gettimeofday(&start, NULL);
 	minTour = (int *)malloc(sizeof(int) * N);
 	pthread_mutex_init(&mutex, NULL);
+	pthread_mutex_init(&mutex2, NULL);
 	srandom(time(0));
 	/* create "nprocess" threads and work! */
 	pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * nprocess);
-	for (int i = 0; i < nprocess; ++i) {
+    for (int i = 0; i < nprocess; ++i) {
 		currTour[i] = (int *)malloc(sizeof(int) * N);
 		for (int j = 0; j < N; ++j)
 			currTour[i][j] = j;
 		if (pthread_create(&threads[i], NULL, routine, (void *)i)) {
-			fprintf(stderr, "Fail to create thread!\n");
+			fprintf(stderr, "Fail to create thread! %d\n", i);
 			exit(1);
 		}
 	}
@@ -277,17 +284,16 @@ int main(int argc, char **argv) {
 	gettimeofday(&stop, NULL);
 
 	// ------------- Print the result! -----------------
-	int tottime = stop.tv_sec - start.tv_sec;
-	int timemin = tottime / 60;
-	int timesec = tottime % 60;
-	printf("Total time usage: %d min %d sec. \n", timemin, timesec);
-	printf("The shortest length is: %f\n And the tour is: \n", minTourDist);
-	for (int i = 0; i < N; ++i) {
-		printf("%d \n", minTour[i]+1);
-	}
+	double  tottime = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0;
+	//int timemin = tottime / 60;
+	//int timesec = tottime % 60;
+	printf("Total time usage: %.3lf sec. \n", tottime);
+	printf("The shortest length is: %f\n\n", minTourDist);
 	free(minTour);
 	for (int i = 0; i < nprocess; ++i)
 		free(currTour[i]);
+    free(threads);
 	pthread_mutex_destroy(&mutex);
+	pthread_mutex_destroy(&mutex2);
 	return 0;
 }

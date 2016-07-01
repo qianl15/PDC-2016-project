@@ -15,7 +15,9 @@
 #include <algorithm>
 #include <sys/time.h>
 #include <omp.h>
-#define MAXITER 20		// Proposal 20 routes and then select the best one
+#ifndef MAXITER
+	#define MAXITER 20		// Proposal 20 routes and then select the best one
+#endif
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
 #define RELAX 40000		// The times of relaxation of the same temperature
@@ -211,6 +213,7 @@ int main(int argc, char **argv) {
 		nprocess = atoi(argv[2]);
 	}
 	omp_set_num_threads(nprocess);
+	printf("MaxIter=%d, Processor=%d, %s\n", MAXITER, nprocess, argv[1]);
 	//omp_lock_t mutex;
 	//omp_init_lock(&mutex);
 	struct timeval start, stop;
@@ -230,21 +233,9 @@ int main(int argc, char **argv) {
 		for (j = 0; j < N; ++j)
 			currTour[i][j] = j;
 		unsigned int s = time(0);
-		rand_x rg(s);
-		random_shuffle(currTour[i], currTour[i] + N, rg);
-		//#pragma omp task
+		#pragma omp critical			
+		random_shuffle(currTour[i], currTour[i] + N);
 		saTSP(currTour[i]);
-		//float currLen = tourLen(currTour);
-		//printf("currLen is: %f\n", currLen);
-		//if ((minTourDist < 0) ||(currLen < minTourDist)) {
-		//	omp_set_lock(&mutex);
-		//	minTourDist = currLen;
-		//	for (int j = 0; j < N; ++j) {
-		//		minTour[j] = currTour[j];
-		//	}
-		//	omp_unset_lock(&mutex);
-		//}
-		//free(currTour);
 		currLen[i] = tourLen(currTour[i]);
 	}
 
@@ -260,14 +251,11 @@ int main(int argc, char **argv) {
 	}
 	gettimeofday(&stop, NULL);
 	// ------------- Print the result! -----------------
-	int tottime = stop.tv_sec - start.tv_sec;
-	int timemin = tottime / 60;
-	int timesec = tottime % 60;
-	printf("Total time usage: %d min %d sec. \n", timemin, timesec);
-	printf("The shortest length is: %f\n And the tour is: \n", minTourDist);
-	for (int i = 0; i < N; ++i) {
-		printf("%d \n", minTour[i]+1);
-	}
+	double tottime = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/1000000.0;
+	//int timemin = tottime / 60;
+	//int timesec = tottime % 60;
+	printf("Total time usage: %.3lf sec. \n", tottime);
+	printf("The shortest length is: %f\n\n", minTourDist);
 	free(minTour);
 	return 0;
 }

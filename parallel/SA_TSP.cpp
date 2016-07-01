@@ -14,7 +14,9 @@
 #include <math.h>
 #include <algorithm>
 #include <sys/time.h>
-#define MAXITER 20		// Proposal 20 routes and then select the best one
+#ifndef MAXITER
+	#define MAXITER 20		// Proposal 20 routes and then select the best one
+#endif
 #define THRESH1 0.1		// Threshold 1 for the strategy
 #define THRESH2 0.89	// Threshold 2 for the strategy
 #define RELAX 40000		// The times of relaxation of the same temperature
@@ -199,11 +201,12 @@ int main(int argc, char **argv) {
 	minTour = (int *)malloc(sizeof(int) * N);
 	int *currTour = (int *)malloc(sizeof(int) * N);
 	unsigned int s = time(0);
+	rand_x rg(s);
 	for (int i = 0; i < MAXITER; ++i) {
 		for (int j = 0; j < N; ++j)
 			currTour[j] = j;
-		rand_x rg(s);
-		random_shuffle(currTour, currTour + N, rg);
+		
+		random_shuffle(currTour, currTour + N);
 		saTSP(currTour);
 		float currLen = tourLen(currTour);
 		//printf("currLen is: %f\n", currLen);
@@ -217,14 +220,15 @@ int main(int argc, char **argv) {
 
 	gettimeofday(&stop, NULL);
 	// ------------- Print the result! -----------------
-	int tottime = stop.tv_sec - start.tv_sec;
-	int timemin = tottime / 60;
-	int timesec = tottime % 60;
-	printf("Total time usage: %d min %d sec. \n", timemin, timesec);
-	printf("The shortest length is: %f\n And the tour is: \n", minTourDist);
-	for (int i = 0; i < N; ++i) {
-		printf("%d \n", minTour[i]+1);
-	}
+	double  tottime = stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/100000.0;
+	//int timemin = tottime / 60;
+	//int timesec = tottime % 60;
+	//printf("Total time usage: %d min %d sec. \n", timemin, timesec);
+	printf("Total time usage: %.3lf sec", tottime);
+	printf("The shortest length is: %f\n \n", minTourDist);
+	//for (int i = 0; i < N; ++i) {
+	//	printf("%d \n", minTour[i]+1);
+	//}
 	free(minTour);
 	free(currTour);
 	return 0;

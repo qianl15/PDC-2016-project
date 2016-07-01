@@ -1,4 +1,4 @@
-CC=g++-4.9
+CC=g++
 FILE1=omp_SA_TSP.cpp
 FLAGS1=-fopenmp -O2 -Wall
 OUT1= -o omp_out
